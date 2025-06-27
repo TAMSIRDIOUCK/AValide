@@ -5,13 +5,20 @@ import RegisterForm from '../components/auth/RegisterForm';
 import { useAuth } from '../context/AuthContext';
 
 const RegisterPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  
-  // Redirect if already logged in
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container-custom py-16 text-center">Chargement...</div>
+      </Layout>
+    );
+  }
+
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
-  
+
   return (
     <Layout>
       <div className="container-custom py-16">

@@ -1,5 +1,5 @@
 // src/utils/cartService.ts
-import { Product } from './productService';
+import { Product } from '../types';
 
 export const addToCart = (product: Product) => {
   const cart = JSON.parse(localStorage.getItem('cart') || '[]');

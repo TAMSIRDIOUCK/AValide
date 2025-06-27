@@ -1,32 +1,93 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star } from 'lucide-react';
+import { Heart, Star } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { Product } from '../../types';
 import { formatPrice } from '../../utils/formatters';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
 
 const FeaturedProducts: React.FC = () => {
   const { addItem } = useCart();
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [visibleProducts, setVisibleProducts] = useState(8);
+
+  // Utiliser une clé locale unique par utilisateur
+  const LOCAL_STORAGE_KEY = user ? `likedProducts_${user.id}` : 'likedProducts_guest';
+
+  // Charger likes depuis localStorage
+  const [likedProducts, setLikedProducts] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Synchroniser localStorage à chaque changement de likedProducts
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(likedProducts));
+    } catch {
+      // ignore error
+    }
+  }, [likedProducts, LOCAL_STORAGE_KEY]);
 
   useEffect(() => {
-    const raw = localStorage.getItem('products');
-    if (raw) {
-      try {
-        const parsed: Product[] = JSON.parse(raw);
-        const sorted = parsed
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 8);
-        setProducts(sorted);
-      } catch (err) {
-        console.error('Erreur de parsing des produits:', err);
+    const fetchProducts = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(8);
+
+      if (error) {
+        console.error('Erreur récupération produits:', error.message);
+      } else {
+        const adapted: Product[] = (data || []).map((p) => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          price: p.price,
+          images: p.images_urls || [],
+          rating: p.rating || 0,
+          reviewCount: p.review_count || 0,
+          createdAt: p.created_at,
+          category: p.category || '',
+          sellerId: p.seller_id,
+          stock: p.stock || 0,
+          category_id: p.category_id,
+        }));
+
+        setProducts(adapted);
       }
-    }
+
+      setLoading(false);
+    };
+
+    fetchProducts();
   }, []);
 
+  const toggleLike = (productId: string) => {
+    setLikedProducts((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const loadMoreProducts = () => {
+    setVisibleProducts((prev) => prev + 10);
+  };
+
+  // Afficher les produits dans l'ordre d'origine, sans tri immédiat après un like
   return (
     <section className="py-16 bg-gray-50">
-      <div className="container-custom">
+      <div className="container-custom px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Produits en Vedette</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
@@ -34,63 +95,101 @@ const FeaturedProducts: React.FC = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {products.map((product) => (
-            <div key={product.id} className="border rounded-lg shadow bg-white">
-              {/* Carrousel horizontal d'images */}
-              <div className="relative bg-gray-200 h-48 overflow-hidden">
-                <div className="flex overflow-x-auto h-full scroll-smooth space-x-2 scrollbar-hide px-2">
-                  {product.images.map((imgUrl, index) => (
-                    <img
-                      key={index}
-                      src={imgUrl}
-                      alt={`${product.title} image ${index + 1}`}
-                      className="h-full w-64 flex-shrink-0 object-cover rounded"
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Infos produit */}
-              <div className="p-4">
-                <Link to={`/products/${product.id}`} className="block">
-                  <h3 className="font-semibold text-lg mb-1 hover:text-primary transition-colors line-clamp-1">
-                    {product.title}
-                  </h3>
-                </Link>
-
-                {/* Étoiles & avis */}
-                <div className="flex items-center mb-2">
-                  <div className="flex text-yellow-400">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={16}
-                        fill={i < Math.floor(product.rating || 0) ? 'currentColor' : 'none'}
-                        className={i < Math.floor(product.rating || 0) ? '' : 'text-gray-300'}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs text-gray-500 ml-1">({product.reviewCount || 0})</span>
-                </div>
-
-                {/* Description */}
-                <p className="text-gray-500 text-sm mb-3 line-clamp-2">{product.description}</p>
-
-                {/* Prix + bouton */}
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-lg">{formatPrice(product.price)}</span>
+        {loading ? (
+          <p className="text-center text-gray-500">Chargement des produits...</p>
+        ) : products.length === 0 ? (
+          <p className="text-center text-gray-500">Aucun produit disponible pour le moment.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {products.slice(0, visibleProducts).map((product) => (
+                <div
+                  key={product.id}
+                  className="relative group border rounded-xl shadow hover:shadow-lg transition bg-white"
+                >
+                  {/* Bouton j’aime */}
                   <button
-                    onClick={() => addItem(product)}
-                    className="text-sm bg-primary text-white py-1 px-3 rounded-md hover:bg-primary-dark transition-colors"
+                    onClick={() => toggleLike(product.id)}
+                    className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white shadow"
                   >
-                    Ajouter
+                    <Heart
+                      size={20}
+                      className={`transition ${
+                        likedProducts.includes(product.id)
+                          ? 'fill-red-500 text-red-500'
+                          : 'text-gray-400'
+                      }`}
+                    />
                   </button>
+
+                  {/* Images carousel */}
+                  <div className="w-full h-80 overflow-hidden rounded-t-xl relative">
+                    <div className="flex overflow-x-auto snap-x snap-mandatory h-full">
+                      {product.images.map((img, idx) => (
+                        <img
+                          key={idx}
+                          src={img}
+                          alt={`${product.title} ${idx + 1}`}
+                          className="snap-center flex-shrink-0 w-full h-full object-cover"
+                          style={{ minWidth: '100%' }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Infos produit */}
+                  <div className="p-4">
+                    <Link to={`/products/${product.id}`} className="block">
+                      <h3 className="font-semibold text-lg mb-1 hover:text-primary transition-colors truncate">
+                        {product.title}
+                      </h3>
+                    </Link>
+
+                    {/* Étoiles & avis */}
+                    <div className="flex items-center mb-2">
+                      <div className="flex text-yellow-400">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={16}
+                            fill="currentColor"
+                            className=""
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                      {product.description}
+                    </p>
+
+                    <p className="font-bold text-lg text-primary mb-3">
+                      {formatPrice(product.price)}
+                    </p>
+
+                    <button
+                      onClick={() => addItem(product)}
+                      className="w-full bg-primary text-white py-2 rounded hover:bg-primary-dark transition"
+                    >
+                      Ajouter au panier
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+
+            {visibleProducts < products.length && (
+              <div className="text-center mt-6">
+                <button
+                  onClick={loadMoreProducts}
+                  className="bg-primary text-white py-2 px-4 rounded hover:bg-primary-dark transition"
+                >
+                  Voir Plus
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </section>
   );

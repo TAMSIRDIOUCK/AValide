@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import LoginForm from '../components/auth/LoginForm';
@@ -11,6 +11,11 @@ const LoginPage: React.FC = () => {
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
+  // Scroll to top on initial load
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   
   return (
     <Layout>

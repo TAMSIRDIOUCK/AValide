@@ -1,69 +1,74 @@
+import { supabase } from '../lib/supabaseClient'; // adapte le chemin si besoin
+import { Product } from '../types'; // ajuste le chemin si nécessaire
 
-const PRODUCTS_KEY = 'products';
+// Récupérer tous les produits depuis Supabase
+export const getAllProductsFromSupabase = async (): Promise<Product[]> => {
+  const { data, error } = await supabase.from('products').select('*');
+  if (error) throw error;
+  return data;
+};
 
-export interface Product {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  price: number;
-  stock: number;
-  images: string[];
-  sellerId: string;
-  createdAt: string;
-  sellerName?: string;
-  rating: number;
-  reviewCount: number;
-}
+// Récupérer les produits d’un vendeur spécifique
+export const getProductsBySellerFromSupabase = async (sellerId: string): Promise<Product[]> => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('seller_id', sellerId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+};
 
-// Enregistrer un produit
-export function saveProduct(product: Product) {
-  const existing = getProducts();
-  const updated = [...existing, product];
-  setProducts(updated);
-}
+// Récupérer les produits par catégorie
+export const getProductsByCategoryFromSupabase = async (category: string): Promise<Product[]> => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('category', category)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+};
 
-// Récupérer tous les produits
-export function getProducts(): Product[] {
-  return JSON.parse(localStorage.getItem(PRODUCTS_KEY) || '[]');
-}
+// Ajouter un produit dans Supabase
+export const addProductToSupabase = async (product: Omit<Product, 'id' | 'created_at'>): Promise<Product> => {
+  const { data, error } = await supabase.from('products').insert([product]).single();
+  if (error) throw error;
+  return data;
+};
 
-// Enregistrer une liste complète de produits
-function setProducts(products: Product[]) {
-  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-}
+// Supprimer un produit par ID dans Supabase
+export const deleteProduct = async (id: string): Promise<void> => {
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) throw error;
+};
 
-// Récupérer les produits les plus récents
-export function getLatestProducts(limit = 6): Product[] {
-  return getProducts()
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, limit);
-}
+// Mettre à jour un produit (ex : stock, titre, prix...)
+export const updateProduct = async (id: string, updates: Partial<Product>): Promise<Product> => {
+  const { data, error } = await supabase.from('products').update(updates).eq('id', id).single();
+  if (error) throw error;
+  return data;
+};
 
-// Produits d’un vendeur
-export function getProductsBySeller(sellerId: string): Product[] {
-  return getProducts().filter(product => product.sellerId === sellerId);
-}
+// Rechercher des produits par mot-clé (titre ou description)
+export const searchProductsInSupabase = async (query: string): Promise<Product[]> => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .ilike('title', `%${query}%`)
+    .or(`description.ilike.%${query}%`)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+};
 
-// Produits par catégorie
-export function getProductsByCategory(categoryId: string): Product[] {
-  return getProducts().filter(product => product.category === categoryId);
-}
-
-// Recherche de produits par mot-clé (titre ou description)
-export function searchProducts(query: string): Product[] {
-  const lowerQuery = query.toLowerCase();
-  return getProducts().filter(product =>
-    product.title.toLowerCase().includes(lowerQuery) ||
-    product.description.toLowerCase().includes(lowerQuery)
-  );
-}
-
-// Supprimer un produit
-export function deleteProduct(id: string) {
-  const products = getProducts();
-  const updated = products.filter(product => product.id !== id);
-  setProducts(updated);
-}
-
-
+// Récupérer les derniers produits ajoutés (limite)
+export const getLatestProducts = async (limit = 6): Promise<Product[]> => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data;
+};

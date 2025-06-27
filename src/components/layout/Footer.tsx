@@ -66,7 +66,7 @@ const Footer: React.FC = () => {
               </li>
               <li className="flex items-center">
                 <Phone size={18} className="mr-2 flex-shrink-0" />
-                <span>+221 33 123 4567</span>
+                <span>+221 70 477 62 58</span>
               </li>
               <li className="flex items-center">
                 <Mail size={18} className="mr-2 flex-shrink-0" />
@@ -83,7 +83,7 @@ const Footer: React.FC = () => {
           <div className="flex flex-wrap justify-center">
             <p className="text-neutral-400 text-sm mb-2 w-full text-center">Modes de paiement acceptés</p>
             <div className="flex space-x-4 justify-center">
-              <div className="bg-white text-primary font-bold rounded-md px-3 py-1">WAV</div>
+              <div className="bg-white text-primary font-bold rounded-md px-3 py-1">AValide_PAY</div>
               <div className="bg-white text-primary font-bold rounded-md px-3 py-1">À la livraison</div>
             </div>
           </div>

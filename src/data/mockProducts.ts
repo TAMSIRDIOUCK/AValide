@@ -3,7 +3,7 @@ import { Product } from '../types';
 export const mockProducts: Product[] = [
   {
     id: '1',
-    title: 'Smartphone Samsung Galaxy A54',
+    title: 'Samsung Galaxy A54',
     description: 'Samsung Galaxy A54 avec écran 6.4" Super AMOLED, 128GB de stockage, 6GB RAM, triple caméra arrière, batterie 5000mAh, couleur noir.',
     price: 189000,
     images: [
@@ -20,7 +20,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: '2',
-    title: 'Robe Traditionnelle Brodée',
+    title: 'Robe Traditionnelle',
     description: 'Magnifique robe traditionnelle sénégalaise avec broderies complexes, disponible en plusieurs tailles. Parfaite pour les cérémonies.',
     price: 25000,
     images: [
@@ -36,7 +36,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: '3',
-    title: 'Table Basse en Bois Massif',
+    title: 'Table Basse Artisanale',
     description: 'Table basse artisanale en bois massif, fabrication locale, dimensions 120x60x45cm. Finition naturelle de haute qualité.',
     price: 85000,
     images: [
@@ -52,7 +52,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: '4',
-    title: 'Service de Réparation Électronique',
+    title: 'Service de Réparation',
     description: 'Réparation professionnelle de smartphones, tablettes et ordinateurs. Service rapide et garantie de 3 mois sur les réparations.',
     price: 15000,
     images: [
@@ -68,7 +68,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: '5',
-    title: 'Lot de 6 Pots de Miel Local',
+    title: 'Lot de Miel Local',
     description: 'Miel 100% naturel et local, récolté dans les forêts du Sénégal. Lot de 6 pots de 250g chacun. Goût authentique et délicieux.',
     price: 18000,
     images: [
@@ -84,7 +84,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: '6',
-    title: 'Ensemble de Soins Visage Bio',
+    title: 'Soins Visage Bio',
     description: 'Ensemble complet de soins visage bio comprenant un nettoyant, un tonique, une crème hydratante et un sérum. Produits naturels fabriqués au Sénégal.',
     price: 35000,
     images: [
@@ -116,7 +116,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: '8',
-    title: 'Chaussures en Cuir Artisanales',
+    title: 'Chaussures en Cuir',
     description: 'Chaussures homme en cuir véritable, fabriquées à la main par des artisans locaux. Confortables et élégantes, disponibles en plusieurs tailles.',
     price: 45000,
     images: [

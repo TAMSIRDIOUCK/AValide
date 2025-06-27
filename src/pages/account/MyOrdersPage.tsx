@@ -1,59 +1,243 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../context/AuthContext';
-import { getOrdersByUser, Order } from '../../utils/orderService';
+import { getOrderItemsBySeller } from '../../utils/orderService';
+import { supabase } from '../../lib/supabaseClient';
+import { AlertCircle, Trash2, PhoneCall, MessageCircle, MessageSquare } from 'lucide-react';
+
+interface ExtendedOrderItem {
+  id: string;
+  productId: string;
+  sellerId: string;
+  orderId: string;
+  quantity: number;
+  price: number;
+  imageUrl?: string;
+  title: string;
+}
+
+interface OrderWithItems {
+  id: string;
+  userId: string;
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  total: number;
+  orderItems: ExtendedOrderItem[];
+}
 
 const MyOrdersPage: React.FC = () => {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderWithItems[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
-    if (user?.id) {
-      const storedOrders = localStorage.getItem('orders');
-      let userOrders = getOrdersByUser(user.id);
-
-      if (storedOrders) {
-        const parsed = JSON.parse(storedOrders) as Order[];
-        userOrders = parsed.filter(order => order.userId === user.id || order.items.some(item => item.sellerId === user.id));
-      }
-
-      const sorted = userOrders.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setOrders(sorted);
-    }
+    fetchOrders();
   }, [user]);
 
-  // Fonction pour valider une commande
-  const handleValidateOrder = (orderId: string) => {
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          status: 'Validée', // Change le statut de la commande
-        };
-      }
-      return order;
-    });
+  const fetchOrders = async () => {
+    if (!user?.id) return;
+    setLoading(true);
 
-    setOrders(updatedOrders);
-    localStorage.setItem('orders', JSON.stringify(updatedOrders));
+    try {
+      const sellerItems = await getOrderItemsBySeller(user.id);
+      const ordersMap: Record<string, ExtendedOrderItem[]> = {};
+
+      sellerItems.forEach((item: any) => {
+        if (!ordersMap[item.order_id]) {
+          ordersMap[item.order_id] = [];
+        }
+        ordersMap[item.order_id].push({
+          id: item.id,
+          productId: item.product_id,
+          sellerId: item.seller_id,
+          orderId: item.order_id,
+          quantity: item.quantity,
+          price: item.price,
+          imageUrl: item.image_url ?? '',
+          title: item.title || 'Produit',
+        });
+      });
+
+      const ordersWithItems: OrderWithItems[] = Object.entries(ordersMap).map(
+        ([orderId, items]) => {
+          const anyItem = sellerItems.find((i: any) => i.order_id === orderId);
+          const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+          return {
+            id: orderId,
+            userId: anyItem?.user_id ?? '',
+            createdAt: anyItem?.created_at ?? '',
+            customerName: anyItem?.customer_name ?? '',
+            customerPhone: anyItem?.customer_phone ?? '',
+            customerAddress: anyItem?.customer_address ?? '',
+            total,
+            orderItems: items,
+          };
+        }
+      );
+
+      ordersWithItems.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setOrders(ordersWithItems);
+    } catch (err) {
+      console.error('❌ Erreur chargement commandes :', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Fonction pour rejeter une commande
-  const handleRejectOrder = (orderId: string) => {
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          status: 'Rejetée', // Change le statut de la commande
-        };
-      }
-      return order;
-    });
+  const openDeleteModal = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setShowDeleteModal(true);
+  };
 
-    setOrders(updatedOrders);
-    localStorage.setItem('orders', JSON.stringify(updatedOrders));
+  const confirmDelete = async () => {
+    if (!selectedOrderId) return;
+    setLoading(true);
+    try {
+      await supabase.from('order_items').delete().eq('order_id', selectedOrderId);
+      await supabase.from('orders').delete().eq('id', selectedOrderId);
+      setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
+    } catch (error) {
+      console.error('❌ Erreur suppression commande :', error);
+      alert('Erreur lors de la suppression.');
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedOrderId(null);
+      setLoading(false);
+    }
+  };
+
+  // Fonctions de regroupement
+  const isToday = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
+  const isThisWeek = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const start = new Date(now.setDate(now.getDate() - now.getDay()));
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return date >= start && date <= end;
+  };
+  const isThisMonth = (dateStr: string) => {
+    const d = new Date(dateStr), now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  };
+  const isThisYear = (dateStr: string) => new Date(dateStr).getFullYear() === new Date().getFullYear();
+
+  const groupedOrders = {
+    today: [] as OrderWithItems[],
+    thisWeek: [] as OrderWithItems[],
+    thisMonth: [] as OrderWithItems[],
+    thisYear: [] as OrderWithItems[],
+    older: [] as OrderWithItems[],
+  };
+
+  orders.forEach((order) => {
+    if (isToday(order.createdAt)) groupedOrders.today.push(order);
+    else if (isThisWeek(order.createdAt)) groupedOrders.thisWeek.push(order);
+    else if (isThisMonth(order.createdAt)) groupedOrders.thisMonth.push(order);
+    else if (isThisYear(order.createdAt)) groupedOrders.thisYear.push(order);
+    else groupedOrders.older.push(order);
+  });
+
+  const periodColors = {
+    today: 'border-red-400 bg-red-50',
+    thisWeek: 'border-blue-400 bg-blue-50',
+    thisMonth: 'border-yellow-400 bg-yellow-50',
+    thisYear: 'border-green-400 bg-green-50',
+    older: 'border-gray-300 bg-gray-50',
+  };
+
+  const renderGroup = (title: string, items: OrderWithItems[], key: keyof typeof periodColors) => {
+    if (items.length === 0) return null;
+
+    return (
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold mb-4">{title} ({items.length})</h2>
+        <ul className="space-y-6">
+          {items.map((order) => (
+            <li key={order.id} className={`border p-4 rounded shadow-sm ${periodColors[key]}`}>
+              <div className="flex justify-between items-center mb-2">
+                <p className="font-semibold">Commande #{order.id}</p>
+                <button
+                  onClick={() => openDeleteModal(order.id)}
+                  className="text-red-600 hover:text-red-800 text-sm font-semibold flex items-center gap-1"
+                >
+                  <Trash2 size={16} />
+                  Supprimer
+                </button>
+              </div>
+              <p className="text-sm text-gray-600">
+                Passée le {new Date(order.createdAt).toLocaleString('fr-FR')}
+              </p>
+              <div className="mt-2 text-sm">
+                <p><strong>Nom :</strong> {order.customerName}</p>
+                <p><strong>Téléphone :</strong> {order.customerPhone}</p>
+                <p><strong>Adresse :</strong> {order.customerAddress}</p>
+              </div>
+
+              {/* 🔘 Boutons de contact */}
+              <div className="mt-2 flex flex-wrap gap-3 text-sm">
+                <a
+                  href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn border border-green-600 text-green-700 hover:bg-green-600 hover:text-white"
+                >
+                  <MessageCircle size={16} className="mr-1" />
+                  WhatsApp
+                </a>
+                <a
+                  href={`tel:${order.customerPhone}`}
+                  className="btn border border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white"
+                >
+                  <PhoneCall size={16} className="mr-1" />
+                  Appeler
+                </a>
+                <a
+                  href={`sms:${order.customerPhone}`}
+                  className="btn border border-gray-500 text-gray-700 hover:bg-gray-500 hover:text-white"
+                >
+                  <MessageSquare size={16} className="mr-1" />
+                  SMS
+                </a>
+              </div>
+
+              <ul className="mt-3 space-y-2">
+                {order.orderItems.map((item) => (
+                  <li key={item.id} className="flex gap-3">
+                    {item.imageUrl && (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title}
+                        className="w-12 h-12 object-cover rounded border"
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.quantity} × {item.price} FCFA ={' '}
+                        {item.quantity * item.price} FCFA
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="mt-3 text-right text-green-700 font-bold">
+                Total : {order.total} FCFA
+              </p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
   };
 
   return (
@@ -61,54 +245,47 @@ const MyOrdersPage: React.FC = () => {
       <div className="container-custom py-10">
         <h1 className="text-2xl font-bold mb-6">Mes commandes</h1>
 
-        {orders.length === 0 ? (
-          <p className="text-gray-600">Aucune commande trouvée.</p>
+        {loading ? (
+          <p>Chargement des commandes...</p>
+        ) : orders.length === 0 ? (
+          <p>Aucune commande trouvée.</p>
         ) : (
-          <ul className="space-y-4">
-            {orders.map(order => {
-              const sellerItems = order.items.filter(item => item.sellerId === user?.id);
+          <>
+            {renderGroup('Commandes du jour', groupedOrders.today, 'today')}
+            {renderGroup('Commandes de la semaine', groupedOrders.thisWeek, 'thisWeek')}
+            {renderGroup('Commandes du mois', groupedOrders.thisMonth, 'thisMonth')}
+            {renderGroup("Commandes de l'année", groupedOrders.thisYear, 'thisYear')}
+            {renderGroup('Commandes plus anciennes', groupedOrders.older, 'older')}
+          </>
+        )}
 
-              return (
-                <li key={order.id} className="border p-4 rounded-lg">
-                  <p className="font-semibold">Commande #{order.id}</p>
-                  <p className="text-sm text-gray-500">Passée le {new Date(order.createdAt).toLocaleDateString()}</p>
-
-                  <div className="mt-2 text-sm text-gray-700">
-                    <p><strong>Client :</strong> {order.customerName}</p>
-                    <p><strong>Téléphone :</strong> {order.customerPhone}</p>
-                    <p><strong>Adresse :</strong> {order.customerAddress}</p>
-                  </div>
-
-                  <ul className="mt-4">
-                    {order.items.map(item => (
-                      <li key={item.productId} className="text-sm text-gray-700">
-                        {item.title} - {item.quantity} × {item.price} FCFA
-                      </li>
-                    ))}
-                  </ul>
-
-                  <p className="mt-2 font-medium">Total : {order.total} FCFA</p>
-
-                  {/* Affiche les boutons pour valider ou rejeter la commande */}
-                  <div className="mt-4">
-                    {order.status === 'Validée' ? (
-                      <span className="text-green-600 font-semibold">✔ Commande validée</span>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleValidateOrder(order.id)}
-                          className="bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700 mr-2"
-                        >
-                          Valider la commande
-                        </button>
-                       
-                      </>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        {/* 🔐 Modal de suppression */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-lg">
+              <div className="flex items-center mb-4">
+                <AlertCircle className="text-red-600 mr-2" size={24} />
+                <h3 className="text-lg font-semibold">Supprimer cette commande ?</h3>
+              </div>
+              <p className="text-gray-600 mb-6">
+                Cette action supprimera la commande et tous ses articles. Elle est irréversible.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="btn bg-red-600 text-white hover:bg-red-700"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </Layout>

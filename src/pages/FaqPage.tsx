@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const FaqPage = () => {
+  // Ajout d'un effet pour faire défiler la page vers le haut lors du chargement
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="container-custom py-10 px-4 md:px-8">
 

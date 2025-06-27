@@ -22,18 +22,16 @@ import ReturnsPage from './pages/ReturnsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 
-// Composant de route protégée
+// Composant de route protégée : exige seulement que l'utilisateur soit connecté
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiresSeller?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiresSeller = false }) => {
-  const { isAuthenticated, loading, user } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (requiresSeller && user?.role !== 'seller') return <Navigate to="/" replace />;
 
   return <>{children}</>;
 };
@@ -51,10 +49,12 @@ function App() {
         <Route path="/category/:id" element={<CategoryPage />} />
         <Route path="/orders" element={<MyOrdersPage />} />
         <Route path="/faq" element={<FaqPage />} />
-    <Route path="/shipping" element={<ShippingPage />} />
-    <Route path="/returns" element={<ReturnsPage />} />
-    <Route path="/terms" element={<TermsPage />} />
-    <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/shipping" element={<ShippingPage />} />
+        <Route path="/returns" element={<ReturnsPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/login" element={<LoginPage />} />
+
         <Route
           path="/checkout"
           element={
@@ -72,11 +72,11 @@ function App() {
           }
         />
 
-        {/* Routes Vendeur */}
+        {/* Routes accessibles à tout utilisateur connecté */}
         <Route
           path="/seller/dashboard"
           element={
-            <ProtectedRoute requiresSeller>
+            <ProtectedRoute>
               <SellerDashboardPage />
             </ProtectedRoute>
           }
@@ -84,7 +84,7 @@ function App() {
         <Route
           path="/seller/products/add"
           element={
-            <ProtectedRoute requiresSeller>
+            <ProtectedRoute>
               <AddProductPage />
             </ProtectedRoute>
           }
@@ -92,7 +92,7 @@ function App() {
         <Route
           path="/seller/products/edit/:id"
           element={
-            <ProtectedRoute requiresSeller>
+            <ProtectedRoute>
               <EditProductPage />
             </ProtectedRoute>
           }

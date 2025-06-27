@@ -1,52 +1,166 @@
-const ORDERS_KEY = 'orders';
+import { supabase } from '../lib/supabaseClient';
+import { Order } from '../types';
 
-export interface OrderItem {
-  productId: string;
-  title: string;
-  quantity: number;
-  price: number;
-  sellerId: string; // ✅ Pour filtrer les commandes par vendeur
-  isProcessed?: boolean; 
+////////////////////////////////////////////////////////////////////////////////
+// 🔁 Convertit une ligne de commande Supabase en objet Order
+////////////////////////////////////////////////////////////////////////////////
+function mapOrderFields(order: any): Order {
+  return {
+    id: order.id,
+    userId: order.user_id,
+    createdAt: order.created_at,
+    total: order.total,
+    customerName: order.customer_name,
+    customerPhone: order.customer_phone,
+    customerAddress: order.customer_address,
+    customerEmail: order.customer_email || '',
+    additionalInfo: order.additional_info || '',
+    paymentMethod: order.payment_method || '',
+    status: order.status || 'en_attente',
+    items: (order.order_items || []).map((item: any) => ({
+      productId: item.product_id,
+      sellerId: item.seller_id,
+      title: item.title || 'Produit',
+      image: item.image_url ? [item.image_url] : [],
+      quantity: item.quantity,
+      price: item.price,
+      customerName: item.customer_name || '',
+      customerPhone: item.customer_phone || '',
+      customerAddress: item.customer_address || '',
+    })),
+  };
 }
 
-export interface Order {
-  id: string;
-  userId: string;
-  createdAt: string;
-  items: OrderItem[];
-  total: number;
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
-  status: string; 
+////////////////////////////////////////////////////////////////////////////////
+// ✅ Marque un article comme validé et vérifie si tous les articles sont validés
+////////////////////////////////////////////////////////////////////////////////
+export async function markOrderItemAsValidated(itemId: string): Promise<void> {
+  // 1. Marquer l'article comme validé
+  const { error: updateError } = await supabase
+    .from('order_items')
+    .update({ status: 'validée' })
+    .eq('id', itemId);
+
+  if (updateError) {
+    throw new Error('Erreur lors de la mise à jour du statut');
+  }
+
+  // 2. Récupérer l'order_id de cet item
+  const { data: itemData, error: fetchError } = await supabase
+    .from('order_items')
+    .select('order_id')
+    .eq('id', itemId)
+    .single();
+
+  if (fetchError || !itemData) {
+    throw new Error('Impossible de récupérer order_id après mise à jour');
+  }
+
+  // 3. Vérifier si tous les articles de la commande sont validés
+  await updateOrderStatusIfAllItemsValidated(itemData.order_id);
 }
 
-// ✅ Enregistrer une commande
-export function saveOrder(order: Order): void {
-  const existingOrders = getOrders();
-  const updatedOrders = [...existingOrders, order];
-  localStorage.setItem(ORDERS_KEY, JSON.stringify(updatedOrders));
-}
+////////////////////////////////////////////////////////////////////////////////
+// ✅ Met à jour le statut global d'une commande si tous ses items sont validés
+////////////////////////////////////////////////////////////////////////////////
+export async function updateOrderStatusIfAllItemsValidated(orderId: string): Promise<void> {
+  const { data: items, error } = await supabase
+    .from('order_items')
+    .select('status')
+    .eq('order_id', orderId);
 
-// ✅ Récupérer toutes les commandes
-export function getOrders(): Order[] {
-  try {
-    const data = localStorage.getItem(ORDERS_KEY);
-    return data ? JSON.parse(data) as Order[] : [];
-  } catch (error) {
-    console.error('Erreur lors du chargement des commandes :', error);
-    return [];
+  if (error || !items) {
+    console.error('❌ Erreur lecture items pour update commande :', error);
+    return;
+  }
+
+  const allValidated = items.every((item) => item.status === 'validée');
+
+  if (allValidated) {
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({ status: 'validée' })
+      .eq('id', orderId);
+
+    if (updateError) {
+      console.error('❌ Erreur mise à jour status commande :', updateError);
+    } else {
+      console.log(`✅ Commande ${orderId} mise à jour à "validée"`);
+    }
   }
 }
 
-// ✅ Récupérer les commandes d’un utilisateur (connecté ou invité)
-export function getOrdersByUser(userId: string): Order[] {
-  return getOrders().filter(order => order.userId === userId);
+////////////////////////////////////////////////////////////////////////////////
+// ✅ Récupère tous les items vendus par un vendeur
+////////////////////////////////////////////////////////////////////////////////
+export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select(`
+      id,
+      order_id,
+      created_at,
+      product_id,
+      quantity,
+      price,
+      seller_id,
+      image_url,
+      title,
+      customer_name,
+      customer_phone,
+      customer_address,
+      status
+    `)
+    .eq('seller_id', sellerId);
+
+  if (error) {
+    console.error('❌ Erreur récupération items :', error);
+    return [];
+  }
+
+  return data || [];
 }
 
-// ✅ Récupérer les commandes d’un vendeur
-export function getOrdersBySeller(sellerId: string): Order[] {
-  return getOrders().filter(order =>
-    order.items.some(item => item.sellerId === sellerId)
+////////////////////////////////////////////////////////////////////////////////
+// ✅ Récupère les commandes d’un vendeur
+////////////////////////////////////////////////////////////////////////////////
+export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      order_items (
+        id,
+        order_id,
+        product_id,
+        quantity,
+        price,
+        seller_id,
+        image_url,
+        title,
+        customer_name,
+        customer_phone,
+        customer_address,
+        status
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ Erreur récupération commandes vendeur :', error);
+    return [];
+  }
+
+  // Filtrer les commandes qui contiennent au moins un article du vendeur
+  const filteredOrders = (data || []).filter((order: any) =>
+    (order.order_items || []).some((item: any) => item.seller_id === sellerId)
   );
+
+  // Pour chaque commande, ne garder que les items du vendeur
+  return filteredOrders.map((order: any) => {
+    order.order_items = (order.order_items || []).filter(
+      (item: any) => item.seller_id === sellerId
+    );
+    return mapOrderFields(order);
+  });
 }

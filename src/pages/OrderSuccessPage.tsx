@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { CheckCircle, ShoppingBag, Home } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface OrderItem {
-  productId: string;
+  id: number;
+  product_id: string;
   title: string;
   price: number;
   quantity: number;
@@ -12,31 +14,63 @@ interface OrderItem {
 
 interface Order {
   id: string;
-  createdAt: string;
-  items: OrderItem[];
-  total: number;
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
+  created_at: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  customer_email?: string;
+  payment_method: string;
+  status: string;
+  order_items: OrderItem[];
 }
 
 const OrderSuccessPage: React.FC = () => {
+  const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const ordersJSON = localStorage.getItem('orders');
-    if (ordersJSON) {
-      const orders: Order[] = JSON.parse(ordersJSON);
-      const latestOrder = orders[orders.length - 1];
-      setOrder(latestOrder);
+    async function fetchOrder() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('id', orderId)
+        .single();
+
+      if (error) {
+        console.error('❌ Erreur lors de la récupération de la commande :', error);
+      } else {
+        setOrder(data);
+      }
+      setLoading(false);
     }
-  }, []);
+
+    if (orderId) {
+      fetchOrder();
+    }
+  }, [orderId]);
+
+  const calculateTotal = () => {
+    if (!order) return 0;
+    return order.order_items.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container-custom py-16 text-center">
+          <p className="text-gray-600">Chargement de votre commande...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!order) {
     return (
       <Layout>
         <div className="container-custom py-16 text-center">
-          <p className="text-gray-600">Aucune commande récente trouvée.</p>
+          <p className="text-gray-600">Aucune commande trouvée.</p>
           <Link
             to="/"
             className="inline-block px-6 py-3 bg-primary text-white rounded-2xl font-semibold hover:bg-primary-dark transition"
@@ -64,22 +98,22 @@ const OrderSuccessPage: React.FC = () => {
           <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
             <h2 className="font-semibold mb-4">Détails de la commande</h2>
             <p><strong>Numéro :</strong> {order.id}</p>
-            <p><strong>Date :</strong> {new Date(order.createdAt).toLocaleDateString('fr-SN')}</p>
-            <p><strong>Total :</strong> {order.total} FCFA</p>
+            <p><strong>Date :</strong> {new Date(order.created_at).toLocaleDateString('fr-SN')}</p>
+            <p><strong>Total :</strong> {calculateTotal()} FCFA</p>
 
             <h3 className="font-semibold mt-6 mb-2">Produits</h3>
             <ul className="text-sm text-gray-700 list-disc pl-5">
-              {order.items.map((item) => (
-                <li key={item.productId}>
+              {order.order_items.map((item) => (
+                <li key={item.id}>
                   {item.title} – {item.quantity} × {item.price} FCFA
                 </li>
               ))}
             </ul>
 
             <h3 className="font-semibold mt-6 mb-2">Livraison</h3>
-            <p><strong>Nom :</strong> {order.customerName}</p>
-            <p><strong>Téléphone :</strong> {order.customerPhone}</p>
-            <p><strong>Adresse :</strong> {order.customerAddress}</p>
+            <p><strong>Nom :</strong> {order.customer_name}</p>
+            <p><strong>Téléphone :</strong> {order.customer_phone}</p>
+            <p><strong>Adresse :</strong> {order.customer_address}</p>
 
             <p className="mt-2 text-gray-600">
               Vous recevrez un SMS lorsque votre commande sera en route.

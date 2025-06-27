@@ -4,15 +4,15 @@ import { Star, Quote } from 'lucide-react';
 const testimonials = [
   {
     id: 1,
-    name: 'Amadou Diop',
+    name: 'jacques',
     role: 'Acheteur',
     avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-    content: 'AValide a complètement changé ma façon d\'acheter en ligne. Le paiement par WAV est super pratique et la livraison est toujours rapide. Je recommande vivement !',
+    content: 'AValide a complètement changé ma façon d\'acheter en ligne. Le paiement par AValide_PAY est super pratique et la livraison est toujours rapide. Je recommande vivement !',
     rating: 5
   },
   {
     id: 2,
-    name: 'Fatou Ndiaye',
+    name: 'Isabelle',
     role: 'Vendeuse',
     avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
     content: 'Depuis que j\'ai commencé à vendre sur AValide, mon entreprise a connu une croissance incroyable. La plateforme est facile à utiliser et l\'équipe de support est très réactive.',
@@ -20,7 +20,7 @@ const testimonials = [
   },
   {
     id: 3,
-    name: 'Omar Sall',
+    name: 'Omar',
     role: 'Acheteur',
     avatar: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
     content: 'Je suis impressionné par la qualité des produits et la fiabilité du service. Le paiement à la livraison m\'a convaincu d\'essayer, et je ne regrette pas mon choix !',

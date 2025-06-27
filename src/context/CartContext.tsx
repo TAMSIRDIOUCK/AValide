@@ -1,42 +1,67 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product } from '../types';
 
-
 export type CartItem = {
   product: Product;
   quantity: number;
+  sellerId: string;
 };
 
 interface CartContextType {
-  cartItems: CartItem[]; // ce champ doit exister
-  items: CartItem[];
+  cartItems: CartItem[];
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   itemCount: number;
   total: number;
- 
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
+  // Charger depuis localStorage au démarrage
   useEffect(() => {
-    const savedCart = localStorage.getItem('avalideCart');
-    if (savedCart) {
-      setItems(JSON.parse(savedCart));
+    try {
+      const savedCart = localStorage.getItem('avalideCart');
+      if (savedCart) {
+        const parsed: CartItem[] = JSON.parse(savedCart);
+
+        const filtered = parsed.filter(
+          item =>
+            item &&
+            item.product &&
+            typeof item.product.id === 'string' &&
+            typeof item.product.price === 'number' &&
+            typeof item.quantity === 'number' &&
+            typeof item.sellerId === 'string'
+        );
+
+        setCartItems(filtered);
+      }
+    } catch (error) {
+      console.error('Erreur de parsing du panier depuis localStorage:', error);
+      setCartItems([]);
     }
   }, []);
 
+  // Sauvegarder dans localStorage à chaque changement
   useEffect(() => {
-    localStorage.setItem('avalideCart', JSON.stringify(items));
-  }, [items]);
+    localStorage.setItem('avalideCart', JSON.stringify(cartItems));
+  }, [cartItems]);
 
+  // ✅ Fonction corrigée ici
   const addItem = (product: Product, quantity = 1) => {
-    setItems((currentItems) => {
+    const sellerId = product.sellerId || (product as any).seller_id;
+
+    if (!product || typeof product.id !== 'string' || typeof product.price !== 'number' || !sellerId) {
+      console.warn('Produit invalide ou sellerId manquant :', product);
+      return;
+    }
+
+    setCartItems(currentItems => {
       const existingItem = currentItems.find(item => item.product.id === product.id);
 
       if (existingItem) {
@@ -46,20 +71,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : item
         );
       } else {
-        return [...currentItems, { product, quantity }];
+        return [...currentItems, { product, quantity, sellerId }];
       }
     });
   };
 
   const removeItem = (productId: string) => {
-    setItems((currentItems) => currentItems.filter(item => item.product.id !== productId));
+    setCartItems(currentItems =>
+      currentItems.filter(item => item.product.id !== productId)
+    );
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
       removeItem(productId);
     } else {
-      setItems((currentItems) =>
+      setCartItems(currentItems =>
         currentItems.map(item =>
           item.product.id === productId
             ? { ...item, quantity }
@@ -70,17 +97,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const clearCart = () => {
-    setItems([]);
+    setCartItems([]);
   };
 
-  const itemCount = items.reduce((count, item) => count + item.quantity, 0);
-  const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const itemCount = cartItems.reduce((count, item) => count + item.quantity, 0);
+  const total = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
   return (
     <CartContext.Provider
-  value={{ cartItems: items, items, addItem, removeItem, updateQuantity, clearCart, itemCount, total }}
->
-
+      value={{
+        cartItems,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        itemCount,
+        total,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

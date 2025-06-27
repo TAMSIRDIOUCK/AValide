@@ -1,10 +1,11 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { getProductsByCategory, searchProducts } from '../../utils/productService';
 import { useCart } from '../../context/CartContext';
 import { Product } from '../../types';
 import Layout from '../../components/layout/Layout';
+import { supabase } from '../../lib/supabaseClient';
+import { Heart } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const CategoryPage = () => {
   const { id: categoryId } = useParams<{ id: string }>();
@@ -13,58 +14,193 @@ const CategoryPage = () => {
   const searchQuery = searchParams.get('search');
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const { user } = useAuth();
+
+  // Utiliser une clé locale unique par utilisateur
+  const LOCAL_STORAGE_KEY = user ? `likedProducts_${user.id}` : 'likedProducts_guest';
+
+  // Charge les likedProducts du localStorage, ou tableau vide
+  const [likedProducts, setLikedProducts] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const { addItem } = useCart();
 
+  // Scroll en haut à chaque changement de catégorie ou recherche
   useEffect(() => {
-    if (searchQuery) {
-      const results = searchProducts(searchQuery);
-      setProducts(results);
-    } else if (categoryId) {
-      const data = getProductsByCategory(categoryId);
-      setProducts(data);
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [categoryId, searchQuery]);
 
+  // Synchroniser likedProducts dans localStorage quand ça change
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(likedProducts));
+    } catch {
+      // ignore
+    }
+  }, [likedProducts, LOCAL_STORAGE_KEY]);
+
+  // Chargement des produits depuis Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+
+      let query = supabase.from('products').select('*');
+
+      if (searchQuery) {
+        query = query.ilike('title', `%${searchQuery}%`);
+      } else if (categoryId) {
+        query = query.eq('category_id', categoryId);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Erreur récupération produits:', error.message);
+        setProducts([]);
+      } else {
+        // Adapter les données pour correspondre au type Product
+        const adapted: Product[] = (data || []).map((p) => ({
+          id: p.id,
+          title: p.title,
+          description: p.description,
+          price: p.price,
+          images: p.images_urls || [],
+          rating: p.rating || 0,
+          reviewCount: p.review_count || 0,
+          createdAt: p.created_at,
+          category: p.category_id || '',
+          sellerId: p.seller_id,
+          stock: p.stock || 0,
+          likes: typeof p.likes === 'number' ? p.likes : 0,
+        }));
+
+        setProducts(adapted);
+      }
+
+      setLoading(false);
+    };
+
+    fetchProducts();
+  }, [categoryId, searchQuery]);
+
+  // Ajout au panier
   const addToCart = (product: Product) => {
     addItem(product);
   };
 
+  // Mise à jour likes dans Supabase
+  const updateLikesInSupabase = async (productId: string, increment: boolean) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+
+    const currentLikes = product.likes ?? 0;
+    const newLikes = increment ? currentLikes + 1 : Math.max(currentLikes - 1, 0);
+
+    const { error } = await supabase
+      .from('products')
+      .update({ likes: newLikes })
+      .eq('id', productId);
+
+    if (error) {
+      console.error('Erreur mise à jour likes:', error.message);
+    } else {
+      setProducts((prevProducts) =>
+        prevProducts.map((p) =>
+          p.id === productId ? { ...p, likes: newLikes } : p
+        )
+      );
+    }
+  };
+
+  // Toggle like avec mise à jour locale et Supabase
+  const toggleLike = (productId: string) => {
+    const isLiked = likedProducts.includes(productId);
+
+    if (isLiked) {
+      setLikedProducts((prev) => prev.filter((id) => id !== productId));
+      updateLikesInSupabase(productId, false);
+    } else {
+      setLikedProducts((prev) => [...prev, productId]);
+      updateLikesInSupabase(productId, true);
+    }
+  };
+
+  // Afficher les produits dans l'ordre d'origine, sans tri immédiat après un like
+  // (on retire le tri dynamique, on affiche simplement products)
   return (
     <Layout>
-      <div className="container mx-auto py-8">
+      <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">
           {searchQuery
             ? `Résultats pour "${searchQuery}"`
             : `Produits de la catégorie`}
         </h1>
 
-        {products.length === 0 ? (
+        {loading ? (
+          <p>Chargement des produits...</p>
+        ) : products.length === 0 ? (
           <p>Aucun produit trouvé.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((product) => (
-              <div key={product.id} className="border p-2 rounded shadow">
-                <div className="relative w-full h-48 overflow-x-auto whitespace-nowrap scroll-smooth rounded mb-2">
-                  {product.images.map((image, index) => (
-                    <img
-                      key={index}
-                      src={image}
-                      alt={`${product.title} ${index + 1}`}
-                      className="inline-block h-48 w-full object-cover rounded mr-2"
-                      style={{ width: '100%', maxWidth: '100%' }}
-                    />
-                  ))}
+              <div
+                key={product.id}
+                className="relative group border rounded-xl shadow hover:shadow-lg transition bg-white flex flex-col"
+              >
+                {/* Bouton J’aime */}
+                <button
+                  onClick={() => toggleLike(product.id)}
+                  className="absolute top-2 right-2 z-10 p-2 rounded-full bg-white shadow hover:scale-110 transition-transform"
+                  aria-label={`J'aime ${product.title}`}
+                >
+                  <Heart
+                    size={24}
+                    className={`transition ${
+                      likedProducts.includes(product.id)
+                        ? 'fill-red-500 text-red-500'
+                        : 'text-gray-400'
+                    }`}
+                  />
+                </button>
+
+                {/* Images carousel */}
+                <div className="w-full h-80 overflow-hidden rounded-t-xl relative">
+                  <div className="flex overflow-x-auto snap-x snap-mandatory h-full">
+                    {product.images.map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={img}
+                        alt={`${product.title} ${idx + 1}`}
+                        className="snap-center flex-shrink-0 w-full h-full object-cover"
+                        style={{ minWidth: '100%' }}
+                      />
+                    ))}
+                  </div>
                 </div>
 
-                <h2 className="font-semibold">{product.title}</h2>
-                <p className="text-sm text-gray-500 line-clamp-2">{product.description}</p>
-                <p className="font-bold mt-2">{product.price} FCFA</p>
-                <button
-                  onClick={() => addToCart(product)}
-                  className="mt-2 bg-primary text-white px-4 py-2 rounded hover:bg-primary-dark transition"
-                >
-                  Ajouter au panier
-                </button>
+                {/* Infos produit */}
+                <div className="p-4 flex flex-col flex-grow">
+                  <h2 className="font-semibold text-lg truncate">{product.title}</h2>
+                  <p className="text-sm text-gray-500 line-clamp-2 flex-grow">
+                    {product.description}
+                  </p>
+                  <p className="mt-2 font-bold text-primary">{product.price} FCFA</p>
+
+                  <button
+                    onClick={() => addToCart(product)}
+                    className="mt-3 w-full bg-primary text-white py-2 rounded hover:bg-primary-dark transition"
+                  >
+                    Ajouter au panier
+                  </button>
+                </div>
               </div>
             ))}
           </div>

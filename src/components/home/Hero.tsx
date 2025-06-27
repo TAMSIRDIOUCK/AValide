@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaVolumeMute, FaVolumeUp } from 'react-icons/fa';
@@ -8,7 +7,7 @@ const Hero: React.FC = () => {
     { id: 1, src: "/videos/v09044g40000chmhjtrc77u2nr6r4bjg.MP4" },
     { id: 2, src: "/videos/v09044g40000cqgjl1vog65h43efqcc0.MP4" },
     { id: 3, src: "/videos/v09044g40000cufkbufog65rnn06q2q0.MP4" },
-    { id: 3, src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4"},
+    { id: 4, src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4" }, // id corrigé ici
   ];
 
   const videoRefs = useRef<HTMLVideoElement[]>([]);
@@ -36,7 +35,7 @@ const Hero: React.FC = () => {
           }
         });
       },
-      { threshold: 0.9 } // doit être presque complètement visible pour jouer
+      { threshold: 0.9 }
     );
 
     videoRefs.current.forEach((video) => {

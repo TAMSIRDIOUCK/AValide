@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import CartItem from '../components/cart/CartItem';
@@ -7,20 +7,24 @@ import { formatPrice } from '../utils/formatters';
 import { ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react';
 
 const CartPage: React.FC = () => {
-  const { items: cartItems, clearCart } = useCart();
+  const { cartItems, clearCart } = useCart();
+  const total = cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
 
-  const total = cartItems.reduce((acc, item) => {
-    return acc + item.product.price * item.quantity;
-  }, 0);
+  // Ajout d'un effet pour faire défiler la page vers le haut lors du chargement
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
     <Layout>
       <div className="container-custom py-16">
+        {/* En-tête affiché tout le temps */}
         <div className="flex items-center mb-8">
           <ShoppingCart size={24} className="text-primary mr-3" />
           <h1 className="text-2xl font-bold">Mon Panier</h1>
         </div>
 
+        {/* Contenu selon s'il y a des articles ou non */}
         {cartItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-gray-100 rounded-full">
@@ -54,7 +58,7 @@ const CartPage: React.FC = () => {
                 </div>
 
                 <div>
-                  {cartItems.map((item) => (
+                  {cartItems.map(item => (
                     <CartItem item={item} key={item.product.id} />
                   ))}
                 </div>

@@ -18,9 +18,9 @@ const PaymentInfo: React.FC = () => {
             <div className="mx-auto w-16 h-16 flex items-center justify-center bg-primary-light/10 rounded-full text-primary mb-4">
               <CreditCard size={32} />
             </div>
-            <h3 className="text-xl font-semibold mb-3">Paiement par WAV</h3>
+            <h3 className="text-xl font-semibold mb-3">Paiement par AValide_PAY</h3>
             <p className="text-gray-600">
-              Payez rapidement et en toute sécurité avec votre compte WAV. Une solution simple et pratique pour vos achats en ligne.
+              Payez rapidement et en toute sécurité avec votre compte AValide_PAY. Une solution simple et pratique pour vos achats en ligne.
             </p>
           </div>
 

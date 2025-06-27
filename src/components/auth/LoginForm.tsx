@@ -1,38 +1,40 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
 import { LogIn, Loader } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const { login } = useAuth();
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
-    
+
     try {
-      const success = await login(email, password);
-      
-      if (success) {
-        navigate('/');
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
       } else {
-        setError('Identifiants incorrects. Veuillez réessayer.');
+        navigate('/');
       }
     } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
       console.error(err);
+      setError('Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-8">
@@ -42,13 +44,13 @@ const LoginForm: React.FC = () => {
           Connectez-vous pour accéder à votre compte
         </p>
       </div>
-      
+
       {error && (
         <div className="bg-error-light/10 text-error border border-error/20 rounded-md p-3 mb-4">
           {error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className="label">Email</label>
@@ -60,9 +62,10 @@ const LoginForm: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoComplete="username"
           />
         </div>
-        
+
         <div>
           <div className="flex items-center justify-between">
             <label htmlFor="password" className="label">Mot de passe</label>
@@ -78,9 +81,10 @@ const LoginForm: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            autoComplete="current-password"
           />
         </div>
-        
+
         <div className="flex items-center">
           <input
             id="remember"
@@ -91,7 +95,7 @@ const LoginForm: React.FC = () => {
             Se souvenir de moi
           </label>
         </div>
-        
+
         <button
           type="submit"
           className="btn-primary w-full flex justify-center"
@@ -104,16 +108,16 @@ const LoginForm: React.FC = () => {
           )}
         </button>
       </form>
-      
-      <div className="mt-6 text-center">
-        <p className="text-gray-600">
-          Vous n'avez pas de compte? {' '}
-          <Link to="/register" className="text-primary hover:underline font-medium">
-            S'inscrire
-          </Link>
-        </p>
+
+      <div className="mt-6 text-center space-y-2">
+        <p className="text-gray-600">Vous n'avez pas encore de compte ?</p>
+        <Link to="/register">
+          <button type="button" className="btn-secondary w-full">
+            Créer un compte
+          </button>
+        </Link>
       </div>
-      
+
       <div className="mt-8 border-t border-gray-200 pt-6">
         <p className="text-sm text-center text-gray-500">
           Pour les tests, utilisez les identifiants :<br />

@@ -1,10 +1,14 @@
-
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/layout/Layout';
-import { Package, Plus, Edit, Trash2, AlertCircle } from 'lucide-react';
+import {
+  Package, Plus, Edit, Trash2, AlertCircle, MessageSquare,
+} from 'lucide-react';
 import { formatPrice } from '../../utils/formatters';
 import { deleteProduct } from '../../utils/productService';
+import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../context/AuthContext';
+import { getOrderItemsBySeller } from '../../utils/orderService';
 
 interface Product {
   id: string;
@@ -12,25 +16,136 @@ interface Product {
   category: string;
   price: number;
   stock: number;
-  images: string[];
-  sellerId: string;
+  images_urls: string[];
+  seller_id: string;
+  created_at?: string;
 }
 
+type Period = 'today' | 'week' | 'month' | 'year';
+
 const SellerDashboardPage: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  const [orderStats, setOrderStats] = useState({ count: 0, total: 0 });
+  const [todayOrdersCount, setTodayOrdersCount] = useState(0);
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedProducts = JSON.parse(localStorage.getItem('products') || '[]');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // 🔑 Récupérer le sellerId dynamique
-    const sellerId = localStorage.getItem('sellerId') || 'seller-123';
+    const fetchData = async () => {
+      if (!user?.id) return;
 
-    // 🎯 Filtrer les produits du vendeur connecté
-    const sellerProducts = savedProducts.filter((p: Product) => p.sellerId === sellerId);
-    setProducts(sellerProducts);
-  }, []);
+      const { data: productsData, error: productError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('seller_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (productError) {
+        console.error('❌ Erreur récupération produits :', productError.message);
+        return;
+      }
+
+      setProducts(productsData || []);
+
+      const items = await getOrderItemsBySeller(user.id);
+
+      const now = new Date();
+      const ordersMap = new Map<string, any[]>();
+      let total = 0;
+      let count = 0;
+      let todayCount = 0;
+
+      items.forEach((item) => {
+        const createdAt = new Date(item.created_at);
+
+        // Pour badge rouge
+        const isToday = createdAt.getDate() === now.getDate()
+          && createdAt.getMonth() === now.getMonth()
+          && createdAt.getFullYear() === now.getFullYear();
+        if (isToday) todayCount++;
+
+        // Filtrage selon période sélectionnée
+        if (isInPeriod(createdAt, selectedPeriod)) {
+          if (!ordersMap.has(item.order_id)) {
+            ordersMap.set(item.order_id, []);
+          }
+          ordersMap.get(item.order_id)?.push(item);
+          total += (item.price || 0) * (item.quantity || 0);
+        }
+      });
+
+      count = ordersMap.size;
+      setOrderStats({ count, total });
+      setTodayOrdersCount(todayCount);
+
+      await checkAndDeleteOutOfStockProducts(productsData || [], items);
+    };
+
+    fetchData();
+  }, [user, selectedPeriod]);
+
+  const isInPeriod = (date: Date, period: Period) => {
+    const now = new Date();
+
+    switch (period) {
+      case 'today':
+        return date.toDateString() === now.toDateString();
+
+      case 'week': {
+        const dayOfWeek = now.getDay();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - dayOfWeek);
+        startOfWeek.setHours(0, 0, 0, 0);
+        return date >= startOfWeek && date <= now;
+      }
+
+      case 'month': {
+        return (
+          date.getFullYear() === now.getFullYear() &&
+          date.getMonth() === now.getMonth()
+        );
+      }
+
+      case 'year': {
+        return date.getFullYear() === now.getFullYear();
+      }
+
+      default:
+        return true;
+    }
+  };
+
+  const checkAndDeleteOutOfStockProducts = async (productList: Product[], orderItems: any[]) => {
+    const updatedStocks: Record<string, number> = {};
+
+    orderItems.forEach((item) => {
+      const id = item.product_id;
+      updatedStocks[id] = (updatedStocks[id] || 0) + item.quantity;
+    });
+
+    for (const product of productList) {
+      const qtyOrdered = updatedStocks[product.id] || 0;
+      const remainingStock = product.stock - qtyOrdered;
+
+      if (remainingStock <= 0) {
+        await deleteProduct(product.id);
+        console.log(`🗑️ Produit supprimé automatiquement : ${product.title}`);
+      } else if (qtyOrdered > 0) {
+        const { error } = await supabase
+          .from('products')
+          .update({ stock: remainingStock })
+          .eq('id', product.id);
+        if (error) {
+          console.error(`❌ Erreur MAJ stock pour ${product.title}`, error);
+        }
+      }
+    }
+  };
 
   const handleDelete = (productId: string) => {
     setSelectedProductId(productId);
@@ -40,29 +155,71 @@ const SellerDashboardPage: React.FC = () => {
   const confirmDelete = () => {
     if (selectedProductId) {
       deleteProduct(selectedProductId);
-      setProducts(prev => prev.filter(product => product.id !== selectedProductId));
+      setProducts((prev) => prev.filter((p) => p.id !== selectedProductId));
     }
     setShowDeleteModal(false);
     setSelectedProductId(null);
   };
 
+  const handleAddProductClick = () => {
+    navigate('/seller/products/add');
+  };
+
   return (
     <Layout>
       <div className="container-custom py-16">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center">
+        {/* FILTRE PÉRIODE */}
+        <div className="mb-4 flex flex-wrap gap-4 justify-between items-center">
+          <div className="flex gap-2 items-center">
+            <label htmlFor="period" className="font-medium">Période :</label>
+            <select
+              id="period"
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value as Period)}
+              className="border px-3 py-1 rounded-md text-sm"
+            >
+              <option value="week">Cette semaine</option>
+              <option value="month">Ce mois-ci</option>
+              <option value="year">Cette année</option>
+            </select>
+          </div>
+
+          <div className="flex gap-4 font-semibold">
+            <span>Commandes reçues : <span className="text-primary font-bold">{orderStats.count}</span></span>
+            <span>Montant total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)} FCFA</span></span>
+          </div>
+        </div>
+
+        {/* EN-TÊTE ET BOUTON */}
+        <div className="flex items-start justify-between flex-col sm:flex-row sm:items-center mb-4 gap-4">
+          <div className="flex items-center mb-2">
             <Package size={24} className="text-primary mr-3" />
             <h1 className="text-2xl font-bold">Tableau de bord vendeur</h1>
           </div>
-          <Link
-  to="/seller/products/add"
-  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-full shadow-lg transition-transform transform hover:scale-105 hover:from-green-600 hover:to-emerald-700"
->
-  <Plus size={20} />
-  Ajouter un produit
-</Link>
+
+          <div className="flex items-center gap-4">
+            <Link
+              to="/orders"
+              className="relative inline-flex items-center justify-center w-10 h-10 bg-primary text-white rounded-full hover:bg-primary-dark transition"
+              title="Mes commandes"
+            >
+              <MessageSquare size={20} />
+              <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-error rounded-full">
+                {todayOrdersCount}
+              </span>
+            </Link>
+
+            <button
+              onClick={handleAddProductClick}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-full shadow-lg transition-transform transform hover:scale-105 hover:from-green-600 hover:to-emerald-700"
+            >
+              <Plus size={20} />
+              Ajouter un produit
+            </button>
+          </div>
         </div>
 
+        {/* PRODUITS */}
         {products.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-primary-light/10 rounded-full">
@@ -72,9 +229,9 @@ const SellerDashboardPage: React.FC = () => {
             <p className="text-gray-600 mb-6">
               Commencez à vendre en ajoutant votre premier produit.
             </p>
-            <Link to="/seller/products/add" className="btn-primary">
+            <button onClick={handleAddProductClick} className="btn-primary">
               Ajouter un produit
-            </Link>
+            </button>
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -82,48 +239,29 @@ const SellerDashboardPage: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produit</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Catégorie</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prix</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Catégorie</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {products.map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 flex-shrink-0">
-                            <img
-                              src={product.images[0]}
-                              alt={product.title}
-                              className="h-10 w-10 rounded-md object-cover"
-                            />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {product.title}
-                            </div>
-                          </div>
-                        </div>
+                      <td className="px-6 py-4 whitespace-nowrap flex items-center">
+                        <img
+                          src={product.images_urls?.[0] || ''}
+                          alt={product.title}
+                          className="h-10 w-10 rounded-md object-cover"
+                        />
+                        <span className="ml-4 text-sm font-medium text-gray-900">{product.title}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary-light/10 text-primary">
-                          {product.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatPrice(product.price)} FCFA
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {product.stock}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link
-                          to={`/seller/products/edit/${product.id}`}
-                          className="text-primary hover:text-primary-dark mr-3"
-                        >
+                      <td className="px-6 py-4 text-sm">{product.category}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{formatPrice(product.price)} FCFA</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{product.stock}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Link to={`/seller/products/edit/${product.id}`} className="text-primary hover:text-primary-dark mr-3">
                           <Edit size={18} />
                         </Link>
                         <button
@@ -142,7 +280,7 @@ const SellerDashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de confirmation de suppression */}
+      {/* MODAL SUPPRESSION */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -157,10 +295,7 @@ const SellerDashboardPage: React.FC = () => {
               <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">
                 Annuler
               </button>
-              <button
-                onClick={confirmDelete}
-                className="btn bg-error text-white hover:bg-error-dark focus:ring-error"
-              >
+              <button onClick={confirmDelete} className="btn bg-error text-white hover:bg-error-dark">
                 Supprimer
               </button>
             </div>

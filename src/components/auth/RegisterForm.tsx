@@ -9,35 +9,30 @@ const RegisterForm: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'buyer' | 'seller'>('buyer');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas.');
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      const success = await register({ name, email, phone, role }, password);
-      
+      const success = await register({ name, email, phone }, password);
+
       if (success) {
-        if (role === 'seller') {
-          navigate('/seller/onboarding');
-        } else {
-          navigate('/');
-        }
+        navigate('/');
       } else {
-        setError('Une erreur est survenue lors de l\'inscription. Veuillez réessayer.');
+        setError("Une erreur est survenue lors de l'inscription. Veuillez réessayer.");
       }
     } catch (err) {
       setError('Une erreur est survenue. Veuillez réessayer.');
@@ -46,7 +41,7 @@ const RegisterForm: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-8">
@@ -56,13 +51,13 @@ const RegisterForm: React.FC = () => {
           Rejoignez AValide pour acheter et vendre facilement
         </p>
       </div>
-      
+
       {error && (
-        <div className="bg-error-light/10 text-error border border-error/20 rounded-md p-3 mb-4">
+        <div className="bg-red-100 text-red-700 border border-red-300 rounded-md p-3 mb-4">
           {error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="name" className="label">Nom complet</label>
@@ -76,7 +71,7 @@ const RegisterForm: React.FC = () => {
             required
           />
         </div>
-        
+
         <div>
           <label htmlFor="email" className="label">Email</label>
           <input
@@ -89,7 +84,7 @@ const RegisterForm: React.FC = () => {
             required
           />
         </div>
-        
+
         <div>
           <label htmlFor="phone" className="label">Numéro de téléphone</label>
           <input
@@ -102,7 +97,7 @@ const RegisterForm: React.FC = () => {
             required
           />
         </div>
-        
+
         <div>
           <label htmlFor="password" className="label">Mot de passe</label>
           <input
@@ -116,7 +111,7 @@ const RegisterForm: React.FC = () => {
             minLength={6}
           />
         </div>
-        
+
         <div>
           <label htmlFor="confirmPassword" className="label">Confirmer le mot de passe</label>
           <input
@@ -129,33 +124,7 @@ const RegisterForm: React.FC = () => {
             required
           />
         </div>
-        
-        <div>
-          <label className="label">Type de compte</label>
-          <div className="grid grid-cols-2 gap-4">
-            <div
-              className={`p-3 border rounded-md cursor-pointer flex items-center justify-center ${
-                role === 'buyer' 
-                  ? 'border-primary bg-primary-light/10 text-primary' 
-                  : 'border-gray-300 text-gray-700'
-              }`}
-              onClick={() => setRole('buyer')}
-            >
-              <span className="font-medium">Acheteur</span>
-            </div>
-            <div
-              className={`p-3 border rounded-md cursor-pointer flex items-center justify-center ${
-                role === 'seller' 
-                  ? 'border-primary bg-primary-light/10 text-primary' 
-                  : 'border-gray-300 text-gray-700'
-              }`}
-              onClick={() => setRole('seller')}
-            >
-              <span className="font-medium">Vendeur</span>
-            </div>
-          </div>
-        </div>
-        
+
         <div className="flex items-center">
           <input
             id="terms"
@@ -164,17 +133,17 @@ const RegisterForm: React.FC = () => {
             required
           />
           <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-            J'accepte les {' '}
+            J'accepte les{' '}
             <Link to="/terms" className="text-primary hover:underline">
               conditions d'utilisation
-            </Link>
-            {' '} et la {' '}
+            </Link>{' '}
+            et la{' '}
             <Link to="/privacy" className="text-primary hover:underline">
               politique de confidentialité
             </Link>
           </label>
         </div>
-        
+
         <button
           type="submit"
           className="btn-primary w-full flex justify-center"
@@ -183,14 +152,14 @@ const RegisterForm: React.FC = () => {
           {isSubmitting ? (
             <Loader className="animate-spin h-5 w-5" />
           ) : (
-            'S\'inscrire'
+            "S'inscrire"
           )}
         </button>
       </form>
-      
+
       <div className="mt-6 text-center">
         <p className="text-gray-600">
-          Vous avez déjà un compte? {' '}
+          Vous avez déjà un compte ?{' '}
           <Link to="/login" className="text-primary hover:underline font-medium">
             Se connecter
           </Link>

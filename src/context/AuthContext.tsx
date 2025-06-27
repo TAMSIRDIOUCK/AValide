@@ -1,121 +1,137 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '../types';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient';
 
-// Définition du type de contexte
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: Partial<User>, password: string) => Promise<boolean>;
-  logout: () => void;
-  loading: boolean;
+export interface ExtendedUser extends SupabaseUser {
+  name?: string;
+  phone?: string;
 }
 
-// Création du contexte sans l'utiliser immédiatement
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType {
+  user: ExtendedUser | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  logout: () => Promise<void>;
+  register: (
+    data: { name: string; email: string; phone: string },
+    password: string
+  ) => Promise<boolean>;
+}
 
-// Provider
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Vérification du localStorage au chargement
-  useEffect(() => {
-    const storedUser = localStorage.getItem('avalideUser');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+  const loadUserProfile = async (session: Session | null) => {
+    if (!session?.user) {
+      setUser(null);
+      return;
     }
-    setLoading(false);
+
+    const baseUser = session.user;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('name, phone')
+      .eq('id', baseUser.id)
+      .maybeSingle(); // ✅ Accepte 0 ou 1 ligne
+
+    if (error) {
+      console.error('Erreur chargement du profil :', error.message);
+      setUser({ ...baseUser });
+    } else {
+      setUser({ ...baseUser, ...profile });
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      await loadUserProfile(data?.session || null);
+      setLoading(false);
+    };
+    init();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      loadUserProfile(session);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  // Fonction de connexion
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setLoading(true);
-    try {
-      if (email === 'demo@example.com' && password === 'password') {
-        const mockUser: User = {
-          id: 'user1',
-          name: 'Demo User',
-          email: 'demo@example.com',
-          phone: '+221 70 123 4567',
-          address: 'Dakar, Sénégal',
-          role: 'buyer',
-          createdAt: new Date().toISOString(),
-        };
-        setUser(mockUser);
-        localStorage.setItem('avalideUser', JSON.stringify(mockUser));
-        return true;
-      }
-
-      if (email === 'seller@example.com' && password === 'password') {
-        const mockSeller: User = {
-          id: 'seller1',
-          name: 'Demo Seller',
-          email: 'seller@example.com',
-          phone: '+221 70 987 6543',
-          address: 'Dakar, Sénégal',
-          role: 'seller',
-          createdAt: new Date().toISOString(),
-        };
-        setUser(mockSeller);
-        localStorage.setItem('avalideUser', JSON.stringify(mockSeller));
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fonction d'inscription
-  const register = async (userData: Partial<User>, password: string): Promise<boolean> => {
-    setLoading(true);
-    try {
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        name: userData.name || 'New User',
-        email: userData.email || '',
-        phone: userData.phone || '',
-        address: userData.address || '',
-        role: userData.role || 'buyer',
-        createdAt: new Date().toISOString(),
-      };
-      setUser(newUser);
-      localStorage.setItem('avalideUser', JSON.stringify(newUser));
-      return true;
-    } catch (error) {
-      console.error('Registration error:', error);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Déconnexion
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('avalideUser');
   };
-// 👉 Affiche un écran de chargement pendant l'init
-if (loading) {
+
+  const register = async (
+    data: { name: string; email: string; phone: string },
+    password: string
+  ): Promise<boolean> => {
+    const { name, email, phone } = data;
+
+    const { data: signUpData, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error || !signUpData.user) {
+      console.error('Erreur inscription :', error?.message);
+      return false;
+    }
+
+    const { error: profileError } = await supabase.from('profiles').insert([
+      {
+        id: signUpData.user.id,
+        name,
+        phone,
+        email, // Ajout du champ email
+      },
+    ]);
+
+    if (profileError) {
+      console.error('Erreur ajout du profil :', profileError.message);
+      return false;
+    }
+
+    await loadUserProfile({
+      user: signUpData.user,
+      access_token: '',
+      token_type: '',
+      expires_in: 0,
+      refresh_token: '',
+    });
+
+    return true;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-600">
+        Chargement...
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-center min-h-screen text-gray-600">
-      Chargement...
-    </div>
-  );
-}
-  return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated: !!user,
+        loading,
+        logout,
+        register,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Hook personnalisé pour consommer le contexte (à utiliser ailleurs)
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
