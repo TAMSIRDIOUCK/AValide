@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FaVolumeMute, FaVolumeUp } from 'react-icons/fa';
 
 const Hero: React.FC = () => {
@@ -7,13 +7,24 @@ const Hero: React.FC = () => {
     { id: 1, src: "/videos/v09044g40000chmhjtrc77u2nr6r4bjg.MP4" },
     { id: 2, src: "/videos/v09044g40000cqgjl1vog65h43efqcc0.MP4" },
     { id: 3, src: "/videos/v09044g40000cufkbufog65rnn06q2q0.MP4" },
-    { id: 4, src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4" }, // id corrigé ici
+    { id: 4, src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4" },
   ];
 
   const videoRefs = useRef<HTMLVideoElement[]>([]);
   const [mutedStates, setMutedStates] = useState<boolean[]>(
-    videoAds.map(() => false) // son activé par défaut
+    videoAds.map(() => false)
   );
+
+  const location = useLocation();
+
+  // ✅ Restaurer scroll si on revient sur cette section
+  useEffect(() => {
+    const savedPosition = sessionStorage.getItem('homeScrollPos');
+    if (savedPosition && location.pathname === '/') {
+      window.scrollTo(0, parseInt(savedPosition, 10));
+      sessionStorage.removeItem('homeScrollPos');
+    }
+  }, [location.pathname]);
 
   const toggleMute = (index: number) => {
     setMutedStates((prev) => {
@@ -49,6 +60,11 @@ const Hero: React.FC = () => {
     };
   }, []);
 
+  // ✅ Fonction pour sauvegarder la position avant navigation
+  const saveScrollPosition = () => {
+    sessionStorage.setItem('homeScrollPos', window.scrollY.toString());
+  };
+
   return (
     <div className="relative bg-gradient-to-r from-primary-dark to-primary overflow-hidden">
       <div className="absolute inset-0">
@@ -63,18 +79,20 @@ const Hero: React.FC = () => {
             Facilement et en Sécurité
           </h1>
           <p className="text-lg md:text-xl text-white opacity-90 mb-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            AValide est la meilleure plateforme pour acheter et vendre des produits et services au Sénégal. Paiement par WAV ou à la livraison.
+            AValide est la meilleure plateforme pour acheter et vendre des produits et services au Sénégal. Paiement par AValide_pay ou à la livraison.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
             <a
               href="#categories"
               className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
+              onClick={saveScrollPosition}
             >
               Parcourir les catégories
             </a>
             <Link
               to="/seller/dashboard"
+              onClick={saveScrollPosition}
               className="btn bg-white text-primary hover:bg-gray-100 focus:ring-white text-center"
             >
               Commencer à vendre

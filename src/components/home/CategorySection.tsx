@@ -4,7 +4,12 @@ import { categories } from '../../data/categories';
 import * as LucideIcons from 'lucide-react';
 
 const CategorySection: React.FC = () => {
-  // Map icon names to Lucide icons
+  // ✅ Sauvegarder la position de scroll avant de quitter la page
+  const saveScrollPosition = () => {
+    sessionStorage.setItem('categoryScrollPos', window.scrollY.toString());
+  };
+
+  // Map icon names to Lucide icons dynamiquement
   const getIcon = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName.charAt(0).toUpperCase() + iconName.slice(1)];
     return Icon ? <Icon size={32} /> : null;
@@ -12,7 +17,6 @@ const CategorySection: React.FC = () => {
 
   return (
     <section id="categories" className="py-24 bg-white">
-
       <div className="container-custom">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Parcourir par Catégorie</h2>
@@ -23,9 +27,10 @@ const CategorySection: React.FC = () => {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
           {categories.map((category) => (
-            <Link 
+            <Link
               key={category.id}
-              to={`/category/${category.id}`} 
+              to={`/category/${category.id}`}
+              onClick={saveScrollPosition} // ✅ sauvegarde ici
               className="bg-neutral-50 rounded-lg p-6 text-center transition duration-300 hover:shadow-md hover:bg-neutral-100 hover:scale-105"
             >
               <div className="text-primary mb-3 mx-auto w-16 h-16 flex items-center justify-center bg-primary-light/10 rounded-full">
@@ -38,7 +43,7 @@ const CategorySection: React.FC = () => {
         </div>
 
         <div className="text-center mt-12">
-          
+          {/* (tu peux ajouter un bouton “Voir tout” ici si besoin) */}
         </div>
       </div>
     </section>

@@ -9,9 +9,7 @@ import Testimonials from '../components/home/Testimonials';
 
 const HomePage: React.FC = () => {
   // Ajout d'un effet pour faire défiler la page vers le haut lors du chargement
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+  
 
   return (
     <Layout>

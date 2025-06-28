@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../context/AuthContext';
-import { getOrderItemsBySeller } from '../../utils/orderService';
 import { supabase } from '../../lib/supabaseClient';
 import { AlertCircle, Trash2, PhoneCall, MessageCircle, MessageSquare } from 'lucide-react';
 
@@ -43,13 +42,19 @@ const MyOrdersPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const sellerItems = await getOrderItemsBySeller(user.id);
-      const ordersMap: Record<string, ExtendedOrderItem[]> = {};
+      // Récupérer les order_items du user (non supprimés)
+      const { data: sellerItems, error: errItems } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('seller_id', user.id)
+        .eq('is_deleted', false); // exclure les supprimés logiquement
 
-      sellerItems.forEach((item: any) => {
-        if (!ordersMap[item.order_id]) {
-          ordersMap[item.order_id] = [];
-        }
+      if (errItems) throw errItems;
+
+      // Regrouper par order_id
+      const ordersMap: Record<string, ExtendedOrderItem[]> = {};
+      sellerItems?.forEach((item: any) => {
+        if (!ordersMap[item.order_id]) ordersMap[item.order_id] = [];
         ordersMap[item.order_id].push({
           id: item.id,
           productId: item.product_id,
@@ -62,31 +67,47 @@ const MyOrdersPage: React.FC = () => {
         });
       });
 
-      const ordersWithItems: OrderWithItems[] = Object.entries(ordersMap).map(
-        ([orderId, items]) => {
-          const anyItem = sellerItems.find((i: any) => i.order_id === orderId);
-          const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      // Récupérer les commandes (orders) non supprimées et correspondantes
+      const orderIds = Object.keys(ordersMap);
+      if (orderIds.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
 
-          return {
-            id: orderId,
-            userId: anyItem?.user_id ?? '',
-            createdAt: anyItem?.created_at ?? '',
-            customerName: anyItem?.customer_name ?? '',
-            customerPhone: anyItem?.customer_phone ?? '',
-            customerAddress: anyItem?.customer_address ?? '',
-            total,
-            orderItems: items,
-          };
-        }
-      );
+      const { data: ordersData, error: errOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .in('id', orderIds)
+        .eq('is_deleted', false);
 
+      if (errOrders) throw errOrders;
+
+      // Construire la liste complète des commandes avec leurs items
+      const ordersWithItems: OrderWithItems[] = ordersData!.map((order: any) => {
+        const items = ordersMap[order.id] ?? [];
+        const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        return {
+          id: order.id,
+          userId: order.user_id,
+          createdAt: order.created_at,
+          customerName: order.customer_name,
+          customerPhone: order.customer_phone,
+          customerAddress: order.customer_address,
+          total,
+          orderItems: items,
+        };
+      });
+
+      // Trier du plus récent au plus ancien
       ordersWithItems.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
       setOrders(ordersWithItems);
-    } catch (err) {
-      console.error('❌ Erreur chargement commandes :', err);
+    } catch (error) {
+      console.error('❌ Erreur chargement commandes :', error);
     } finally {
       setLoading(false);
     }
@@ -97,12 +118,23 @@ const MyOrdersPage: React.FC = () => {
     setShowDeleteModal(true);
   };
 
+  // Suppression logique : mettre is_deleted à true au lieu de supprimer
   const confirmDelete = async () => {
     if (!selectedOrderId) return;
     setLoading(true);
+
     try {
-      await supabase.from('order_items').delete().eq('order_id', selectedOrderId);
-      await supabase.from('orders').delete().eq('id', selectedOrderId);
+      await supabase
+        .from('order_items')
+        .update({ is_deleted: true })
+        .eq('order_id', selectedOrderId);
+
+      await supabase
+        .from('orders')
+        .update({ is_deleted: true })
+        .eq('id', selectedOrderId);
+
+      // Mettre à jour localement la liste des commandes
       setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
     } catch (error) {
       console.error('❌ Erreur suppression commande :', error);
@@ -114,18 +146,20 @@ const MyOrdersPage: React.FC = () => {
     }
   };
 
-  // Fonctions de regroupement
+  // Fonctions de regroupement par date
   const isToday = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
   const isThisWeek = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const start = new Date(now.setDate(now.getDate() - now.getDay()));
+    const start = new Date(now);
+    start.setDate(now.getDate() - now.getDay());
     const end = new Date(start);
     end.setDate(start.getDate() + 6);
     return date >= start && date <= end;
   };
   const isThisMonth = (dateStr: string) => {
-    const d = new Date(dateStr), now = new Date();
+    const d = new Date(dateStr);
+    const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   };
   const isThisYear = (dateStr: string) => new Date(dateStr).getFullYear() === new Date().getFullYear();
@@ -168,6 +202,7 @@ const MyOrdersPage: React.FC = () => {
                 <button
                   onClick={() => openDeleteModal(order.id)}
                   className="text-red-600 hover:text-red-800 text-sm font-semibold flex items-center gap-1"
+                  disabled={loading}
                 >
                   <Trash2 size={16} />
                   Supprimer
@@ -182,7 +217,7 @@ const MyOrdersPage: React.FC = () => {
                 <p><strong>Adresse :</strong> {order.customerAddress}</p>
               </div>
 
-              {/* 🔘 Boutons de contact */}
+              {/* Boutons de contact */}
               <div className="mt-2 flex flex-wrap gap-3 text-sm">
                 <a
                   href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}`}
@@ -259,7 +294,7 @@ const MyOrdersPage: React.FC = () => {
           </>
         )}
 
-        {/* 🔐 Modal de suppression */}
+        {/* Modal suppression */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-lg">
@@ -274,12 +309,14 @@ const MyOrdersPage: React.FC = () => {
                 <button
                   onClick={() => setShowDeleteModal(false)}
                   className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  disabled={loading}
                 >
                   Annuler
                 </button>
                 <button
                   onClick={confirmDelete}
                   className="btn bg-red-600 text-white hover:bg-red-700"
+                  disabled={loading}
                 >
                   Supprimer
                 </button>

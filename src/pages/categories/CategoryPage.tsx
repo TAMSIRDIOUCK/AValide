@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { Product } from '../../types';
 import Layout from '../../components/layout/Layout';
@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 const CategoryPage = () => {
   const { id: categoryId } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const searchQuery = searchParams.get('search');
 
@@ -17,11 +18,10 @@ const CategoryPage = () => {
   const [loading, setLoading] = useState(true);
 
   const { user } = useAuth();
+  const { addItem } = useCart();
 
-  // Utiliser une clé locale unique par utilisateur
   const LOCAL_STORAGE_KEY = user ? `likedProducts_${user.id}` : 'likedProducts_guest';
 
-  // Charge les likedProducts du localStorage, ou tableau vide
   const [likedProducts, setLikedProducts] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -31,27 +31,36 @@ const CategoryPage = () => {
     }
   });
 
-  const { addItem } = useCart();
+  // ✅ Restaurer position de scroll si sauvegardée
+  useEffect(() => {
+    const savedPosition = sessionStorage.getItem('categoryScrollPos');
+    if (savedPosition) {
+      window.scrollTo(0, parseInt(savedPosition, 10));
+      sessionStorage.removeItem('categoryScrollPos');
+    }
+  }, []);
 
-  // Scroll en haut à chaque changement de catégorie ou recherche
+  // ✅ Sauvegarder position scroll avant navigation
+  const saveScrollPosition = () => {
+    sessionStorage.setItem('categoryScrollPos', window.scrollY.toString());
+  };
+
+  // Scroll top au changement de catégorie ou recherche
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [categoryId, searchQuery]);
 
-  // Synchroniser likedProducts dans localStorage quand ça change
+  // Sync likes localStorage
   useEffect(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(likedProducts));
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [likedProducts, LOCAL_STORAGE_KEY]);
 
-  // Chargement des produits depuis Supabase
+  // Récupérer les produits
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
-
       let query = supabase.from('products').select('*');
 
       if (searchQuery) {
@@ -66,7 +75,6 @@ const CategoryPage = () => {
         console.error('Erreur récupération produits:', error.message);
         setProducts([]);
       } else {
-        // Adapter les données pour correspondre au type Product
         const adapted: Product[] = (data || []).map((p) => ({
           id: p.id,
           title: p.title,
@@ -91,12 +99,10 @@ const CategoryPage = () => {
     fetchProducts();
   }, [categoryId, searchQuery]);
 
-  // Ajout au panier
   const addToCart = (product: Product) => {
     addItem(product);
   };
 
-  // Mise à jour likes dans Supabase
   const updateLikesInSupabase = async (productId: string, increment: boolean) => {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
@@ -112,15 +118,12 @@ const CategoryPage = () => {
     if (error) {
       console.error('Erreur mise à jour likes:', error.message);
     } else {
-      setProducts((prevProducts) =>
-        prevProducts.map((p) =>
-          p.id === productId ? { ...p, likes: newLikes } : p
-        )
+      setProducts((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, likes: newLikes } : p))
       );
     }
   };
 
-  // Toggle like avec mise à jour locale et Supabase
   const toggleLike = (productId: string) => {
     const isLiked = likedProducts.includes(productId);
 
@@ -133,8 +136,6 @@ const CategoryPage = () => {
     }
   };
 
-  // Afficher les produits dans l'ordre d'origine, sans tri immédiat après un like
-  // (on retire le tri dynamique, on affiche simplement products)
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
@@ -171,7 +172,7 @@ const CategoryPage = () => {
                   />
                 </button>
 
-                {/* Images carousel */}
+                {/* Carousel d’image */}
                 <div className="w-full h-80 overflow-hidden rounded-t-xl relative">
                   <div className="flex overflow-x-auto snap-x snap-mandatory h-full">
                     {product.images.map((img, idx) => (
@@ -200,6 +201,19 @@ const CategoryPage = () => {
                   >
                     Ajouter au panier
                   </button>
+
+                  {/* Exemple lien détail produit */}
+                  {/* 
+                  <button
+                    onClick={() => {
+                      saveScrollPosition();
+                      navigate(`/product/${product.id}`);
+                    }}
+                    className="mt-2 text-sm underline text-primary"
+                  >
+                    Voir détails
+                  </button>
+                  */}
                 </div>
               </div>
             ))}

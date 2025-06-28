@@ -18,7 +18,7 @@ const Footer: React.FC = () => {
               <span className="text-xl font-bold">AValide</span>
             </div>
             <p className="text-neutral-300 mb-4">
-              La plateforme de commerce électronique qui permet aux Sénégalais d'acheter et de vendre facilement des produits et services, avec paiement par WAV ou à la livraison.
+              La plateforme de commerce électronique qui permet aux Sénégalais d'acheter et de vendre facilement des produits et services, avec paiement par AValide_pay ou à la livraison.
             </p>
             <div className="flex space-x-4">
               <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-white hover:text-primary transition-colors">

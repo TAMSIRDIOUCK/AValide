@@ -26,6 +26,7 @@ type Period = 'today' | 'week' | 'month' | 'year';
 const SellerDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [products, setProducts] = useState<Product[]>([]);
   const [orderStats, setOrderStats] = useState({ count: 0, total: 0 });
   const [todayOrdersCount, setTodayOrdersCount] = useState(0);
@@ -33,43 +34,43 @@ const SellerDashboardPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // 🔁 Fonction séparée pour recharger les produits
+  const fetchProducts = async () => {
+    if (!user?.id) return;
 
-    const fetchData = async () => {
-      if (!user?.id) return;
+    const { data: productsData, error: productError } = await supabase
+      .from('products')
+      .select('*')
+      .eq('seller_id', user.id)
+      .order('created_at', { ascending: false });
 
-      const { data: productsData, error: productError } = await supabase
-        .from('products')
-        .select('*')
-        .eq('seller_id', user.id)
-        .order('created_at', { ascending: false });
+    if (productError) {
+      console.error('Erreur chargement produits:', productError.message);
+      return;
+    }
 
-      if (productError) {
-        console.error('❌ Erreur récupération produits :', productError.message);
-        return;
-      }
+    setProducts(productsData || []);
+  };
 
-      setProducts(productsData || []);
+  // 🔁 Fonction pour charger les commandes
+  const fetchOrders = async () => {
+    if (!user?.id) return;
 
+    try {
       const items = await getOrderItemsBySeller(user.id);
+      if (!items || !Array.isArray(items)) return;
 
       const now = new Date();
       const ordersMap = new Map<string, any[]>();
       let total = 0;
-      let count = 0;
       let todayCount = 0;
 
       items.forEach((item) => {
         const createdAt = new Date(item.created_at);
+        const isToday = createdAt.toDateString() === now.toDateString();
 
-        // Pour badge rouge
-        const isToday = createdAt.getDate() === now.getDate()
-          && createdAt.getMonth() === now.getMonth()
-          && createdAt.getFullYear() === now.getFullYear();
         if (isToday) todayCount++;
 
-        // Filtrage selon période sélectionnée
         if (isInPeriod(createdAt, selectedPeriod)) {
           if (!ordersMap.has(item.order_id)) {
             ordersMap.set(item.order_id, []);
@@ -79,14 +80,16 @@ const SellerDashboardPage: React.FC = () => {
         }
       });
 
-      count = ordersMap.size;
-      setOrderStats({ count, total });
+      setOrderStats({ count: ordersMap.size, total });
       setTodayOrdersCount(todayCount);
+    } catch (error) {
+      console.error('Erreur chargement commandes:', error);
+    }
+  };
 
-      await checkAndDeleteOutOfStockProducts(productsData || [], items);
-    };
-
-    fetchData();
+  useEffect(() => {
+    fetchProducts();
+    fetchOrders();
   }, [user, selectedPeriod]);
 
   const isInPeriod = (date: Date, period: Period) => {
@@ -95,7 +98,6 @@ const SellerDashboardPage: React.FC = () => {
     switch (period) {
       case 'today':
         return date.toDateString() === now.toDateString();
-
       case 'week': {
         const dayOfWeek = now.getDay();
         const startOfWeek = new Date(now);
@@ -103,47 +105,13 @@ const SellerDashboardPage: React.FC = () => {
         startOfWeek.setHours(0, 0, 0, 0);
         return date >= startOfWeek && date <= now;
       }
-
-      case 'month': {
-        return (
-          date.getFullYear() === now.getFullYear() &&
-          date.getMonth() === now.getMonth()
-        );
-      }
-
-      case 'year': {
+      case 'month':
+        return date.getFullYear() === now.getFullYear() &&
+               date.getMonth() === now.getMonth();
+      case 'year':
         return date.getFullYear() === now.getFullYear();
-      }
-
       default:
         return true;
-    }
-  };
-
-  const checkAndDeleteOutOfStockProducts = async (productList: Product[], orderItems: any[]) => {
-    const updatedStocks: Record<string, number> = {};
-
-    orderItems.forEach((item) => {
-      const id = item.product_id;
-      updatedStocks[id] = (updatedStocks[id] || 0) + item.quantity;
-    });
-
-    for (const product of productList) {
-      const qtyOrdered = updatedStocks[product.id] || 0;
-      const remainingStock = product.stock - qtyOrdered;
-
-      if (remainingStock <= 0) {
-        await deleteProduct(product.id);
-        console.log(`🗑️ Produit supprimé automatiquement : ${product.title}`);
-      } else if (qtyOrdered > 0) {
-        const { error } = await supabase
-          .from('products')
-          .update({ stock: remainingStock })
-          .eq('id', product.id);
-        if (error) {
-          console.error(`❌ Erreur MAJ stock pour ${product.title}`, error);
-        }
-      }
     }
   };
 
@@ -152,14 +120,33 @@ const SellerDashboardPage: React.FC = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    if (selectedProductId) {
-      deleteProduct(selectedProductId);
-      setProducts((prev) => prev.filter((p) => p.id !== selectedProductId));
+  const confirmDelete = async () => {
+    if (!selectedProductId) return;
+  
+    try {
+      // Supprime dans Supabase
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', selectedProductId);
+  
+      if (error) {
+        console.error('Erreur suppression produit:', error.message);
+        alert("Erreur lors de la suppression.");
+        return;
+      }
+  
+      // Supprime immédiatement dans la page (état local)
+      setProducts((prev) => prev.filter(product => product.id !== selectedProductId));
+  
+      // Ferme la modale
+      setShowDeleteModal(false);
+      setSelectedProductId(null);
+    } catch (err) {
+      console.error('Erreur inattendue:', err);
     }
-    setShowDeleteModal(false);
-    setSelectedProductId(null);
   };
+  
 
   const handleAddProductClick = () => {
     navigate('/seller/products/add');
@@ -190,7 +177,7 @@ const SellerDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* EN-TÊTE ET BOUTON */}
+        {/* EN-TÊTE */}
         <div className="flex items-start justify-between flex-col sm:flex-row sm:items-center mb-4 gap-4">
           <div className="flex items-center mb-2">
             <Package size={24} className="text-primary mr-3" />
@@ -247,32 +234,37 @@ const SellerDashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {products.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap flex items-center">
-                        <img
-                          src={product.images_urls?.[0] || ''}
-                          alt={product.title}
-                          className="h-10 w-10 rounded-md object-cover"
-                        />
-                        <span className="ml-4 text-sm font-medium text-gray-900">{product.title}</span>
-                      </td>
-                      <td className="px-6 py-4 text-sm">{product.category}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{formatPrice(product.price)} FCFA</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{product.stock}</td>
-                      <td className="px-6 py-4 text-right">
-                        <Link to={`/seller/products/edit/${product.id}`} className="text-primary hover:text-primary-dark mr-3">
-                          <Edit size={18} />
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          className="text-error hover:text-error-dark"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {products.map((product) => {
+                    if (!product || !product.id || !product.title) return null;
+
+                    return (
+                      <tr key={product.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap flex items-center">
+                          <img
+                            src={product.images_urls?.[0] || '/placeholder.png'}
+                            alt={product.title}
+                            className="h-10 w-10 rounded-md object-cover"
+                          />
+                          <span className="ml-4 text-sm font-medium text-gray-900">{product.title}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm">{product.category}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{formatPrice(product.price)} FCFA</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{product.stock}</td>
+                        <td className="px-6 py-4 text-right">
+                          <Link to={`/seller/products/edit/${product.id}`} className="text-primary hover:text-primary-dark mr-3">
+                            <Edit size={18} />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="text-error hover:text-error-dark"
+                            aria-label={`Supprimer ${product.title}`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -292,10 +284,16 @@ const SellerDashboardPage: React.FC = () => {
               Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.
             </p>
             <div className="flex justify-end space-x-3">
-              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              >
                 Annuler
               </button>
-              <button onClick={confirmDelete} className="btn bg-error text-white hover:bg-error-dark">
+              <button
+                onClick={confirmDelete}
+                className="btn bg-error text-white hover:bg-error-dark"
+              >
                 Supprimer
               </button>
             </div>
