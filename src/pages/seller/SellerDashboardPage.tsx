@@ -5,7 +5,6 @@ import {
   Package, Plus, Edit, Trash2, AlertCircle, MessageSquare,
 } from 'lucide-react';
 import { formatPrice } from '../../utils/formatters';
-import { deleteProduct } from '../../utils/productService';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { getOrderItemsBySeller } from '../../utils/orderService';
@@ -34,25 +33,30 @@ const SellerDashboardPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
-  // 🔁 Fonction séparée pour recharger les produits
+  // Scroll automatique en haut
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Charger les produits du vendeur
   const fetchProducts = async () => {
     if (!user?.id) return;
 
-    const { data: productsData, error: productError } = await supabase
+    const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('seller_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (productError) {
-      console.error('Erreur chargement produits:', productError.message);
+    if (error) {
+      console.error('Erreur chargement produits :', error.message);
       return;
     }
 
-    setProducts(productsData || []);
+    setProducts(data || []);
   };
 
-  // 🔁 Fonction pour charger les commandes
+  // Charger les commandes du vendeur
   const fetchOrders = async () => {
     if (!user?.id) return;
 
@@ -83,7 +87,7 @@ const SellerDashboardPage: React.FC = () => {
       setOrderStats({ count: ordersMap.size, total });
       setTodayOrdersCount(todayCount);
     } catch (error) {
-      console.error('Erreur chargement commandes:', error);
+      console.error('Erreur chargement commandes :', error);
     }
   };
 
@@ -99,15 +103,14 @@ const SellerDashboardPage: React.FC = () => {
       case 'today':
         return date.toDateString() === now.toDateString();
       case 'week': {
-        const dayOfWeek = now.getDay();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - dayOfWeek);
-        startOfWeek.setHours(0, 0, 0, 0);
-        return date >= startOfWeek && date <= now;
+        const day = now.getDay();
+        const start = new Date(now);
+        start.setDate(now.getDate() - day);
+        start.setHours(0, 0, 0, 0);
+        return date >= start && date <= now;
       }
       case 'month':
-        return date.getFullYear() === now.getFullYear() &&
-               date.getMonth() === now.getMonth();
+        return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
       case 'year':
         return date.getFullYear() === now.getFullYear();
       default:
@@ -122,31 +125,22 @@ const SellerDashboardPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!selectedProductId) return;
-  
-    try {
-      // Supprime dans Supabase
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', selectedProductId);
-  
-      if (error) {
-        console.error('Erreur suppression produit:', error.message);
-        alert("Erreur lors de la suppression.");
-        return;
-      }
-  
-      // Supprime immédiatement dans la page (état local)
-      setProducts((prev) => prev.filter(product => product.id !== selectedProductId));
-  
-      // Ferme la modale
-      setShowDeleteModal(false);
-      setSelectedProductId(null);
-    } catch (err) {
-      console.error('Erreur inattendue:', err);
+
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', selectedProductId);
+
+    if (error) {
+      alert("Erreur lors de la suppression.");
+      console.error('Erreur suppression :', error.message);
+      return;
     }
+
+    setProducts((prev) => prev.filter((p) => p.id !== selectedProductId));
+    setShowDeleteModal(false);
+    setSelectedProductId(null);
   };
-  
 
   const handleAddProductClick = () => {
     navigate('/seller/products/add');
@@ -155,7 +149,7 @@ const SellerDashboardPage: React.FC = () => {
   return (
     <Layout>
       <div className="container-custom py-16">
-        {/* FILTRE PÉRIODE */}
+        {/* Filtres de période */}
         <div className="mb-4 flex flex-wrap gap-4 justify-between items-center">
           <div className="flex gap-2 items-center">
             <label htmlFor="period" className="font-medium">Période :</label>
@@ -170,35 +164,34 @@ const SellerDashboardPage: React.FC = () => {
               <option value="year">Cette année</option>
             </select>
           </div>
-
           <div className="flex gap-4 font-semibold">
-            <span>Commandes reçues : <span className="text-primary font-bold">{orderStats.count}</span></span>
-            <span>Montant total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)} FCFA</span></span>
+            <span>Commandes : <span className="text-primary font-bold">{orderStats.count}</span></span>
+            <span>Total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)} FCFA</span></span>
           </div>
         </div>
 
-        {/* EN-TÊTE */}
-        <div className="flex items-start justify-between flex-col sm:flex-row sm:items-center mb-4 gap-4">
-          <div className="flex items-center mb-2">
+        {/* En-tête */}
+        <div className="flex justify-between flex-col sm:flex-row sm:items-center gap-4 mb-4">
+          <div className="flex items-center">
             <Package size={24} className="text-primary mr-3" />
             <h1 className="text-2xl font-bold">Tableau de bord vendeur</h1>
           </div>
-
           <div className="flex items-center gap-4">
             <Link
               to="/orders"
-              className="relative inline-flex items-center justify-center w-10 h-10 bg-primary text-white rounded-full hover:bg-primary-dark transition"
+              className="relative w-10 h-10 flex items-center justify-center bg-primary text-white rounded-full hover:bg-primary-dark"
               title="Mes commandes"
             >
               <MessageSquare size={20} />
-              <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-error rounded-full">
-                {todayOrdersCount}
-              </span>
+              {todayOrdersCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 text-xs bg-error text-white w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                  {todayOrdersCount}
+                </span>
+              )}
             </Link>
-
             <button
               onClick={handleAddProductClick}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-medium rounded-full shadow-lg transition-transform transform hover:scale-105 hover:from-green-600 hover:to-emerald-700"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full font-medium shadow-lg hover:scale-105 transition"
             >
               <Plus size={20} />
               Ajouter un produit
@@ -206,22 +199,20 @@ const SellerDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* PRODUITS */}
+        {/* Produits */}
         {products.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="bg-white p-8 rounded-lg shadow text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-primary-light/10 rounded-full">
               <Package size={32} className="text-primary" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Aucun produit</h2>
-            <p className="text-gray-600 mb-6">
-              Commencez à vendre en ajoutant votre premier produit.
-            </p>
+            <p className="text-gray-600 mb-6">Commencez à vendre en ajoutant un produit.</p>
             <button onClick={handleAddProductClick} className="btn-primary">
               Ajouter un produit
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white rounded-lg shadow overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
@@ -234,37 +225,33 @@ const SellerDashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {products.map((product) => {
-                    if (!product || !product.id || !product.title) return null;
-
-                    return (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap flex items-center">
-                          <img
-                            src={product.images_urls?.[0] || '/placeholder.png'}
-                            alt={product.title}
-                            className="h-10 w-10 rounded-md object-cover"
-                          />
-                          <span className="ml-4 text-sm font-medium text-gray-900">{product.title}</span>
-                        </td>
-                        <td className="px-6 py-4 text-sm">{product.category}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{formatPrice(product.price)} FCFA</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{product.stock}</td>
-                        <td className="px-6 py-4 text-right">
-                          <Link to={`/seller/products/edit/${product.id}`} className="text-primary hover:text-primary-dark mr-3">
-                            <Edit size={18} />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className="text-error hover:text-error-dark"
-                            aria-label={`Supprimer ${product.title}`}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {products.map((product) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 flex items-center">
+                        <img
+                          src={product.images_urls?.[0] || '/placeholder.png'}
+                          alt={product.title}
+                          className="h-10 w-10 rounded-md object-cover"
+                        />
+                        <span className="ml-4 text-sm font-medium text-gray-900">{product.title}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">{product.category}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{formatPrice(product.price)} FCFA</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{product.stock}</td>
+                      <td className="px-6 py-4 text-right">
+                        <Link to={`/seller/products/edit/${product.id}`} className="text-primary hover:text-primary-dark mr-3">
+                          <Edit size={18} />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="text-error hover:text-error-dark"
+                          aria-label={`Supprimer ${product.title}`}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -272,10 +259,10 @@ const SellerDashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL SUPPRESSION */}
+      {/* Modal suppression */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <div className="flex items-center mb-4">
               <AlertCircle size={24} className="text-error mr-2" />
               <h3 className="text-lg font-semibold">Confirmer la suppression</h3>
@@ -283,17 +270,11 @@ const SellerDashboardPage: React.FC = () => {
             <p className="text-gray-600 mb-6">
               Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.
             </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-              >
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 text-gray-600 hover:text-gray-800">
                 Annuler
               </button>
-              <button
-                onClick={confirmDelete}
-                className="btn bg-error text-white hover:bg-error-dark"
-              >
+              <button onClick={confirmDelete} className="btn bg-error text-white hover:bg-error-dark">
                 Supprimer
               </button>
             </div>
