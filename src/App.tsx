@@ -1,6 +1,6 @@
 // src/App.tsx
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 import Header from './components/layout/Header';
@@ -22,6 +22,7 @@ import ReturnsPage from './pages/ReturnsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 
+// Composant de route protégée : exige seulement que l'utilisateur soit connecté
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
@@ -52,6 +53,7 @@ function App() {
         <Route path="/returns" element={<ReturnsPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/login" element={<LoginPage />} />
 
         <Route
           path="/checkout"
@@ -70,6 +72,7 @@ function App() {
           }
         />
 
+        {/* Routes accessibles à tout utilisateur connecté */}
         <Route
           path="/seller/dashboard"
           element={
@@ -95,6 +98,7 @@ function App() {
           }
         />
 
+        {/* Redirection si route non trouvée */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
