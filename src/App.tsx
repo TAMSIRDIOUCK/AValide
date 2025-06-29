@@ -22,7 +22,6 @@ import ReturnsPage from './pages/ReturnsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 
-// Composant de route protégée : exige seulement que l'utilisateur soit connecté
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
@@ -38,7 +37,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
 function App() {
   return (
-    <>
+    <Router>
       <Header />
       <Routes>
         <Route path="/" element={<HomePage />} />
@@ -53,7 +52,6 @@ function App() {
         <Route path="/returns" element={<ReturnsPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/login" element={<LoginPage />} />
 
         <Route
           path="/checkout"
@@ -72,7 +70,6 @@ function App() {
           }
         />
 
-        {/* Routes accessibles à tout utilisateur connecté */}
         <Route
           path="/seller/dashboard"
           element={
@@ -98,10 +95,9 @@ function App() {
           }
         />
 
-        {/* Redirection si route non trouvée */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </Router>
   );
 }
 
