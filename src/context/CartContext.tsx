@@ -22,13 +22,11 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // Charger depuis localStorage au démarrage
   useEffect(() => {
     try {
       const savedCart = localStorage.getItem('avalideCart');
       if (savedCart) {
         const parsed: CartItem[] = JSON.parse(savedCart);
-
         const filtered = parsed.filter(
           item =>
             item &&
@@ -38,7 +36,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             typeof item.quantity === 'number' &&
             typeof item.sellerId === 'string'
         );
-
         setCartItems(filtered);
       }
     } catch (error) {
@@ -47,30 +44,44 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Sauvegarder dans localStorage à chaque changement
   useEffect(() => {
     localStorage.setItem('avalideCart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // ✅ Fonction corrigée ici
   const addItem = (product: Product, quantity = 1) => {
     const sellerId = product.sellerId || (product as any).seller_id;
 
-    if (!product || typeof product.id !== 'string' || typeof product.price !== 'number' || !sellerId) {
+    if (
+      !product ||
+      typeof product.id !== 'string' ||
+      typeof product.price !== 'number' ||
+      !sellerId
+    ) {
       console.warn('Produit invalide ou sellerId manquant :', product);
       return;
     }
 
     setCartItems(currentItems => {
       const existingItem = currentItems.find(item => item.product.id === product.id);
+      const maxStock = product.stock ?? Infinity;
 
       if (existingItem) {
+        const newQuantity = existingItem.quantity + quantity;
+        if (newQuantity > maxStock) {
+          alert(`Stock limité. Seulement ${maxStock} en stock.`);
+          return currentItems;
+        }
+
         return currentItems.map(item =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: newQuantity }
             : item
         );
       } else {
+        if (quantity > maxStock) {
+          alert(`Stock limité. Seulement ${maxStock} en stock.`);
+          return currentItems;
+        }
         return [...currentItems, { product, quantity, sellerId }];
       }
     });
@@ -83,6 +94,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
+    const productInCart = cartItems.find(item => item.product.id === productId);
+    const maxStock = productInCart?.product.stock ?? Infinity;
+
+    if (quantity > maxStock) {
+      alert(`Stock insuffisant. Seulement ${maxStock} en stock.`);
+      return;
+    }
+
     if (quantity <= 0) {
       removeItem(productId);
     } else {

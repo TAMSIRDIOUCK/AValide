@@ -1,3 +1,4 @@
+// src/pages/CartPage.tsx
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
@@ -17,22 +18,18 @@ const CartPage: React.FC = () => {
   return (
     <Layout>
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-10">
-        {/* EN-TÊTE */}
         <div className="flex items-center mb-6">
           <ShoppingCart size={24} className="text-primary mr-3" />
           <h1 className="text-2xl font-bold">Mon Panier</h1>
         </div>
 
-        {/* PANIER VIDE */}
         {cartItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-6 text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-gray-100 rounded-full">
               <ShoppingBag size={32} className="text-gray-400" />
             </div>
             <h2 className="text-lg font-semibold mb-2">Votre panier est vide</h2>
-            <p className="text-gray-600 mb-4">
-              Parcourez notre catalogue et ajoutez des produits.
-            </p>
+            <p className="text-gray-600 mb-4">Parcourez notre catalogue et ajoutez des produits.</p>
             <Link
               to="/products"
               className="inline-block bg-primary text-white font-semibold px-5 py-2.5 rounded-full shadow hover:bg-primary-dark transition"
@@ -41,14 +38,11 @@ const CartPage: React.FC = () => {
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col gap-6 lg:flex-row">
-            {/* Liste des articles */}
+          <div className="flex flex-col lg:flex-row gap-6">
             <div className="w-full lg:w-2/3">
               <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 <div className="border-b pb-4 mb-4 flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">
-                    Articles ({cartItems.length})
-                  </h2>
+                  <h2 className="text-lg font-semibold">Articles ({cartItems.length})</h2>
                   <button
                     onClick={clearCart}
                     className="text-sm text-red-600 hover:text-red-700 font-medium hover:underline transition"
@@ -56,7 +50,6 @@ const CartPage: React.FC = () => {
                     Vider le panier
                   </button>
                 </div>
-
                 <div className="space-y-4">
                   {cartItems.map((item) => (
                     <CartItem item={item} key={item.product.id} />
@@ -65,7 +58,6 @@ const CartPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Récapitulatif */}
             <div className="w-full lg:w-1/3">
               <div className="bg-white rounded-lg shadow p-4 sm:p-6 sticky top-20">
                 <h2 className="text-lg font-semibold border-b pb-4 mb-4">Récapitulatif</h2>
