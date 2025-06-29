@@ -74,12 +74,12 @@ const Hero: React.FC = () => {
       <div className="relative container-custom py-16 md:py-24">
         {/* Présentation */}
         <div className="max-w-2xl">
-          <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight mb-4 animate-slide-up">
+          <h1 className="text-4xl md:text-4xl font-bold text-white leading-tight mb-4 animate-slide-up">
             Achetez et Vendez au Sénégal <br />
             Facilement et en Sécurité
           </h1>
           <p className="text-lg md:text-xl text-white opacity-90 mb-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            AValide est la meilleure plateforme pour acheter et vendre des produits et services au Sénégal. Paiement par AValide_pay ou à la livraison.
+          Paiement par AValide_pay ou à la livraison.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
@@ -88,14 +88,14 @@ const Hero: React.FC = () => {
               className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
               onClick={saveScrollPosition}
             >
-              Parcourir les catégories
+              acheter
             </a>
             <Link
               to="/seller/dashboard"
               onClick={saveScrollPosition}
-              className="btn bg-white text-primary hover:bg-gray-100 focus:ring-white text-center"
+              className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
             >
-              Commencer à vendre
+               Vendez
             </Link>
           </div>
         </div>
