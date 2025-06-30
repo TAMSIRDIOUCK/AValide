@@ -35,7 +35,7 @@ const MyOrdersPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // ✅ Fait défiler en haut automatiquement
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     fetchOrders();
   }, [user]);
 
@@ -103,9 +103,15 @@ const MyOrdersPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await supabase.from('order_items').delete().eq('order_id', selectedOrderId);
-      await supabase.from('orders').delete().eq('id', selectedOrderId);
-      setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
+      const { error: itemsError } = await supabase.from('order_items').delete().eq('order_id', selectedOrderId);
+      const { error: orderError } = await supabase.from('orders').delete().eq('id', selectedOrderId);
+
+      if (itemsError || orderError) {
+        console.error('❌ Erreur lors de la suppression :', itemsError || orderError);
+        alert('Erreur lors de la suppression.');
+      } else {
+        setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
+      }
     } catch (error) {
       console.error('❌ Erreur suppression commande :', error);
       alert('Erreur lors de la suppression.');

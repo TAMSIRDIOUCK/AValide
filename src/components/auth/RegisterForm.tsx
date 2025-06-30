@@ -15,12 +15,47 @@ const RegisterForm: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  const validateInputs = () => {
+    const trimmedName = name.trim();
+    const trimmedPhone = phone.trim();
+    const trimmedEmail = email.trim();
+
+    // Nom : lettres et espaces uniquement
+    const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/;
+    if (!nameRegex.test(trimmedName)) {
+      return "Le nom ne doit contenir que des lettres et des espaces.";
+    }
+
+    // Email : doit se terminer par @gmail.com
+    if (!trimmedEmail.endsWith('@gmail.com')) {
+      return "Veuillez utiliser une adresse se terminant par @gmail.com.";
+    }
+
+    // Téléphone : format international ou local accepté (ex: +221 77..., +33 6..., etc.)
+    const phoneRegex = /^\+?[0-9\s\-()]{7,20}$/;
+    if (!phoneRegex.test(trimmedPhone)) {
+      return "Le numéro de téléphone est invalide. Veuillez vérifier le format.";
+    }
+
+    // Mot de passe
+    if (password.length < 6) {
+      return "Le mot de passe doit contenir au moins 6 caractères.";
+    }
+
+    if (password !== confirmPassword) {
+      return "Les mots de passe ne correspondent pas.";
+    }
+
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+    const validationError = validateInputs();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -35,7 +70,7 @@ const RegisterForm: React.FC = () => {
         setError("Une erreur est survenue lors de l'inscription. Veuillez réessayer.");
       }
     } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
+      setError("Une erreur inattendue s'est produite. Veuillez réessayer.");
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -77,7 +112,7 @@ const RegisterForm: React.FC = () => {
           <input
             id="email"
             type="email"
-            placeholder="votre@email.com"
+            placeholder="votre@gmail.com"
             className="input"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -90,7 +125,7 @@ const RegisterForm: React.FC = () => {
           <input
             id="phone"
             type="tel"
-            placeholder="+221 70 123 4567"
+            placeholder="+221 77 123 4567"
             className="input"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}

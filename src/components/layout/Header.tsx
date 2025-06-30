@@ -46,17 +46,16 @@ const Header: React.FC = () => {
     const fetchUserName = async () => {
       if (user?.id) {
         const { data, error } = await supabase
-  .from('profiles')
-  .select('name')
-  .eq('id', user.id)
-  .maybeSingle(); // permet 0 ou 1 résultat
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .maybeSingle();
 
-if (error) {
-  console.error('Erreur récupération nom :', error.message);
-} else if (data) {
-  console.log('Nom utilisateur :', data.name);
-}
-
+        if (error) {
+          console.error('Erreur récupération nom :', error.message);
+        } else if (data) {
+          setUserName(data.name);
+        }
       }
     };
     fetchUserName();
@@ -87,10 +86,13 @@ if (error) {
   };
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'
-    }`}>
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'
+      }`}
+    >
       <div className="container-custom flex items-center justify-between">
+        {/* Logo */}
         <Link to="/" className="flex items-center text-primary">
           <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" className="mr-2">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
@@ -112,6 +114,7 @@ if (error) {
               <Search size={18} />
             </button>
           </form>
+
           {suggestions.length > 0 && (
             <div className="absolute z-50 w-full mt-1 bg-white border rounded shadow max-h-60 overflow-y-auto">
               {suggestions.map(product => (
@@ -130,6 +133,7 @@ if (error) {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6">
           <Link to="/" className="nav-link">Accueil</Link>
+
           {isAuthenticated ? (
             <div className="relative group">
               <button className="flex items-center space-x-2">
@@ -158,6 +162,7 @@ if (error) {
               <span className="text-sm">Connexion</span>
             </Link>
           )}
+
           <Link to="/cart" className="relative">
             <ShoppingCart size={22} />
             {itemCount > 0 && (
@@ -170,7 +175,7 @@ if (error) {
 
         {/* Mobile Menu Button */}
         <div className="md:hidden flex items-center space-x-4">
-          <Link to="/cart" className="relative">
+          <Link to="/cart" className="relative" aria-label="Voir le panier">
             <ShoppingCart size={22} />
             {itemCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-secondary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -178,40 +183,53 @@ if (error) {
               </span>
             )}
           </Link>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Menu mobile"
+            className="focus:outline-none"
+          >
+            {isMobileMenuOpen ? <Menu size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200 px-4 pt-2 pb-3">
-          <form onSubmit={handleSearch} className="relative mb-2">
+        <div className="md:hidden bg-white border-t border-gray-200 px-4 py-4 shadow z-50">
+          <form onSubmit={handleSearch} className="relative mb-3">
             <input
               type="text"
-              placeholder="Rechercher..."
-              className="w-full px-4 py-2 rounded-full border border-gray-300"
+              placeholder="Rechercher un produit..."
+              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button type="submit" className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <button
+              type="submit"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+              aria-label="Rechercher"
+            >
               <Search size={18} />
             </button>
           </form>
+
           {suggestions.length > 0 && (
-            <div className="z-50 mt-1 bg-white border rounded shadow max-h-60 overflow-y-auto">
-              {suggestions.map(product => (
+            <div className="bg-white border border-gray-300 rounded-md shadow-md max-h-60 overflow-y-auto">
+              {suggestions.map((product) => (
                 <div
                   key={product.id}
-                  onClick={() => handleSuggestionClick(product.title)}
-                  className="px-4 py-2 cursor-pointer hover:bg-gray-100"
+                  onClick={() => {
+                    handleSuggestionClick(product.title);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm"
                 >
                   {product.title}
                 </div>
               ))}
             </div>
           )}
+
           <Link to="/" className="block py-2">Accueil</Link>
           {isAuthenticated ? (
             <>

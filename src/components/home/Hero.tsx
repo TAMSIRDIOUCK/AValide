@@ -95,7 +95,7 @@ const Hero: React.FC = () => {
               onClick={saveScrollPosition}
               className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
             >
-               Vendez
+               Vendre
             </Link>
           </div>
         </div>
