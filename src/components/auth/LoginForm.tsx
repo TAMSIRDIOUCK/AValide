@@ -118,13 +118,7 @@ const LoginForm: React.FC = () => {
         </Link>
       </div>
 
-      <div className="mt-8 border-t border-gray-200 pt-6">
-        <p className="text-sm text-center text-gray-500">
-          Pour les tests, utilisez les identifiants :<br />
-          <span className="font-mono">demo@example.com / password</span> (acheteur)<br />
-          <span className="font-mono">seller@example.com / password</span> (vendeur)
-        </p>
-      </div>
+      
     </div>
   );
 };
