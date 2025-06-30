@@ -143,7 +143,7 @@ const SellerDashboardPage: React.FC = () => {
           </div>
           <div className="flex gap-4 font-semibold">
             <span>Commandes : <span className="text-primary font-bold">{orderStats.count}</span></span>
-            <span>Total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)} FCFA</span></span>
+            <span>Total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)} </span></span>
           </div>
         </div>
 
