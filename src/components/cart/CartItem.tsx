@@ -46,15 +46,18 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
           <img src={imageUrl} alt={product.description} className="w-full h-full object-cover" />
         </div>
         <div className="flex flex-col gap-1 overflow-hidden">
+          {/* ✅ Titre du produit en haut en gras */}
+          <span className="font-bold text-sm text-gray-800 line-clamp-1">
+            {product.title}
+          </span>
+
           <Link
             to={`/products/${product.id}`}
-            className="text-base font-semibold text-gray-800 hover:text-primary line-clamp-1"
+            className="text-base font-medium text-gray-700 hover:text-primary line-clamp-1"
           >
             {product.description}
           </Link>
-          <span className="text-sm text-gray-500 line-clamp-1">
-            Vendeur : {product.sellerName || 'Inconnu'}
-          </span>
+
           <span className="text-primary font-semibold text-sm">
             {formatPrice(product.price)}
           </span>

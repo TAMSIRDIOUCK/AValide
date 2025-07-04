@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient';
 export interface ExtendedUser extends SupabaseUser {
   name?: string;
   phone?: string;
+  can_sell?: boolean; // ✅ Ajout ici
 }
 
 interface AuthContextType {
@@ -13,7 +14,7 @@ interface AuthContextType {
   loading: boolean;
   logout: () => Promise<void>;
   register: (
-    data: { name: string; email: string; phone: string },
+    data: { name: string; email: string; phone: string; can_sell?: boolean },
     password: string
   ) => Promise<boolean>;
 }
@@ -34,9 +35,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('name, phone')
+      .select('name, phone, can_sell') // ✅ récupère can_sell
       .eq('id', baseUser.id)
-      .maybeSingle(); // ✅ Accepte 0 ou 1 ligne
+      .maybeSingle();
 
     if (error) {
       console.error('Erreur chargement du profil :', error.message);
@@ -69,10 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (
-    data: { name: string; email: string; phone: string },
+    data: { name: string; email: string; phone: string; can_sell?: boolean },
     password: string
   ): Promise<boolean> => {
-    const { name, email, phone } = data;
+    const { name, email, phone, can_sell } = data;
 
     const { data: signUpData, error } = await supabase.auth.signUp({
       email,
@@ -89,7 +90,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: signUpData.user.id,
         name,
         phone,
-        email, // Ajout du champ email
+        email,
+        can_sell, // ✅ insertion can_sell si fourni
       },
     ]);
 

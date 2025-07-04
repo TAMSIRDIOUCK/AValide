@@ -32,6 +32,7 @@ const SellerDashboardPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false); // ✅ Ajout pour l'alerte
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -120,7 +121,13 @@ const SellerDashboardPage: React.FC = () => {
   };
 
   const handleAddProductClick = () => {
-    navigate('/seller/products/add');
+    if (!user) return;
+
+    if (user.can_sell) {
+      navigate('/seller/products/add');
+    } else {
+      setShowModal(true);
+    }
   };
 
   return (
@@ -232,6 +239,32 @@ const SellerDashboardPage: React.FC = () => {
                 </button>
                 <button onClick={confirmDelete} className="btn bg-error text-white hover:bg-error-dark">
                   Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL DE RESTRICTION DE VENTE */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div className="bg-white p-6 rounded shadow-lg max-w-sm">
+              <p className="text-lg font-semibold mb-4">
+                Pour vendre sur AValide, veuillez contacter l’équipe.
+              </p>
+              <div className="flex justify-end gap-3">
+                <a
+                  href="https://wa.me/221704776258"
+                  target="_blank"
+                  className="btn bg-green-600 text-white"
+                >
+                  Contacter via WhatsApp
+                </a>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="btn bg-gray-300 text-black"
+                >
+                  OK
                 </button>
               </div>
             </div>

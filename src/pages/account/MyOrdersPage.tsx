@@ -3,7 +3,7 @@ import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { getOrderItemsBySeller } from '../../utils/orderService';
 import { supabase } from '../../lib/supabaseClient';
-import { AlertCircle, Trash2, PhoneCall, MessageCircle, MessageSquare } from 'lucide-react';
+import { AlertCircle, Trash2, PhoneCall, MessageCircle, MessageSquare, Printer } from 'lucide-react';
 
 interface ExtendedOrderItem {
   id: string;
@@ -87,7 +87,7 @@ const MyOrdersPage: React.FC = () => {
 
       setOrders(ordersWithItems);
     } catch (err) {
-      console.error('❌ Erreur chargement commandes :', err);
+      console.error('\u274C Erreur chargement commandes :', err);
     } finally {
       setLoading(false);
     }
@@ -107,18 +107,46 @@ const MyOrdersPage: React.FC = () => {
       const { error: orderError } = await supabase.from('orders').delete().eq('id', selectedOrderId);
 
       if (itemsError || orderError) {
-        console.error('❌ Erreur lors de la suppression :', itemsError || orderError);
+        console.error('\u274C Erreur lors de la suppression :', itemsError || orderError);
         alert('Erreur lors de la suppression.');
       } else {
         setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
       }
     } catch (error) {
-      console.error('❌ Erreur suppression commande :', error);
+      console.error('\u274C Erreur suppression commande :', error);
       alert('Erreur lors de la suppression.');
     } finally {
       setShowDeleteModal(false);
       setSelectedOrderId(null);
       setLoading(false);
+    }
+  };
+
+  const printSingleOrder = (order: OrderWithItems) => {
+    const printContent = `
+      <div style="padding: 20px; font-family: Arial, sans-serif;">
+        <h2>Commande #${order.id}</h2>
+        <p><strong>Date :</strong> ${new Date(order.createdAt).toLocaleString('fr-FR')}</p>
+        <p><strong>Nom :</strong> ${order.customerName}</p>
+        <p><strong>Téléphone :</strong> ${order.customerPhone}</p>
+        <p><strong>Adresse :</strong> ${order.customerAddress}</p>
+        <hr />
+        ${order.orderItems.map(item => `
+          <p>${item.title} - ${item.quantity} × ${item.price} FCFA = ${item.quantity * item.price} FCFA</p>
+        `).join('')}
+        <hr />
+        <p><strong>Total :</strong> ${order.total} FCFA</p>
+      </div>
+    `;
+
+    const newWindow = window.open('', '', 'width=800,height=600');
+    if (newWindow) {
+      newWindow.document.write('<html><head><title>Impression Commande</title></head><body>');
+      newWindow.document.write(printContent);
+      newWindow.document.write('</body></html>');
+      newWindow.document.close();
+      newWindow.focus();
+      newWindow.print();
     }
   };
 
@@ -174,14 +202,23 @@ const MyOrdersPage: React.FC = () => {
             <li key={order.id} className={`border p-4 rounded shadow-sm ${periodColors[key]}`}>
               <div className="flex justify-between items-center mb-2">
                 <p className="font-semibold">Commande #{order.id}</p>
-                <button
-                  onClick={() => openDeleteModal(order.id)}
-                  className="text-red-600 hover:text-red-800 text-sm font-semibold flex items-center gap-1"
-                  disabled={loading}
-                >
-                  <Trash2 size={16} />
-                  Supprimer
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => printSingleOrder(order)}
+                    className="text-gray-600 hover:text-black text-sm font-semibold flex items-center gap-1"
+                  >
+                    <Printer size={16} />
+                    Imprimer
+                  </button>
+                  <button
+                    onClick={() => openDeleteModal(order.id)}
+                    className="text-red-600 hover:text-red-800 text-sm font-semibold flex items-center gap-1"
+                    disabled={loading}
+                  >
+                    <Trash2 size={16} />
+                    Supprimer
+                  </button>
+                </div>
               </div>
               <p className="text-sm text-gray-600">
                 Passée le {new Date(order.createdAt).toLocaleString('fr-FR')}
@@ -191,7 +228,6 @@ const MyOrdersPage: React.FC = () => {
                 <p><strong>Téléphone :</strong> {order.customerPhone}</p>
                 <p><strong>Adresse :</strong> {order.customerAddress}</p>
               </div>
-
               <div className="mt-2 flex flex-wrap gap-3 text-sm">
                 <a
                   href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}`}
@@ -217,7 +253,6 @@ const MyOrdersPage: React.FC = () => {
                   SMS
                 </a>
               </div>
-
               <ul className="mt-3 space-y-2">
                 {order.orderItems.map((item) => (
                   <li key={item.id} className="flex gap-3">
@@ -231,14 +266,12 @@ const MyOrdersPage: React.FC = () => {
                     <div>
                       <p className="font-medium">{item.title}</p>
                       <p className="text-sm text-gray-600">
-                        {item.quantity} × {item.price} FCFA ={' '}
-                        {item.quantity * item.price} FCFA
+                        {item.quantity} × {item.price} FCFA = {item.quantity * item.price} FCFA
                       </p>
                     </div>
                   </li>
                 ))}
               </ul>
-
               <p className="mt-3 text-right text-green-700 font-bold">
                 Total : {order.total} FCFA
               </p>
@@ -253,7 +286,6 @@ const MyOrdersPage: React.FC = () => {
     <Layout>
       <div className="container-custom py-10">
         <h1 className="text-2xl font-bold mb-6">Mes commandes</h1>
-
         {loading ? (
           <p>Chargement des commandes...</p>
         ) : orders.length === 0 ? (
@@ -267,7 +299,6 @@ const MyOrdersPage: React.FC = () => {
             {renderGroup('Commandes plus anciennes', groupedOrders.older, 'older')}
           </>
         )}
-
         {showDeleteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-lg">

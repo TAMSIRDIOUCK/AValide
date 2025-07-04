@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 
 const FeaturedProducts: React.FC = () => {
-  const { addItem, cartItems } = useCart(); // ✅ cartItems ajouté
+  const { addItem, cartItems } = useCart();
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,9 +78,8 @@ const FeaturedProducts: React.FC = () => {
     setVisibleProducts((prev) => prev + 10);
   };
 
-  const getQuantityInCart = (productId: string) => {
-    const item = cartItems.find((item) => item.product.id === productId);
-    return item ? item.quantity : 0;
+  const isAlreadyInCart = (productId: string) => {
+    return cartItems.some((item) => item.product.id === productId);
   };
 
   return (
@@ -101,8 +100,7 @@ const FeaturedProducts: React.FC = () => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {products.slice(0, visibleProducts).map((product) => {
-                const quantityInCart = getQuantityInCart(product.id);
-                const isOutOfStock = quantityInCart >= product.stock;
+                const inCart = isAlreadyInCart(product.id);
 
                 return (
                   <div
@@ -161,13 +159,13 @@ const FeaturedProducts: React.FC = () => {
                       <button
                         onClick={() => addItem(product)}
                         className={`w-full py-2 rounded transition ${
-                          isOutOfStock
+                          inCart
                             ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                             : 'bg-primary text-white hover:bg-primary-dark'
                         }`}
-                        disabled={isOutOfStock}
+                        disabled={inCart}
                       >
-                        {isOutOfStock ? 'Stock épuisé' : 'Ajouter au panier'}
+                        {inCart ? 'Déjà dans le panier' : 'Ajouter au panier'}
                       </button>
                     </div>
                   </div>
