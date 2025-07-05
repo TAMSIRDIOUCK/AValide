@@ -74,17 +74,18 @@ const Header: React.FC = () => {
     setSuggestions(filtered.slice(0, 5));
   }, [searchQuery, allProducts]);
 
+  // ✅ Affiche le message pendant 1 heure après la commande
   useEffect(() => {
     const lastOrderTime = localStorage.getItem('lastOrderTime');
     if (lastOrderTime) {
       const now = Date.now();
-      const twoHours = 2 * 60 * 60 * 1000;
-      if (now - parseInt(lastOrderTime) < twoHours) {
+      const oneHour = 60 * 60 * 1000;
+      if (now - parseInt(lastOrderTime) < oneHour) {
         setShowOrderMessage(true);
         const timeout = setTimeout(() => {
           setShowOrderMessage(false);
           localStorage.removeItem('lastOrderTime');
-        }, twoHours - (now - parseInt(lastOrderTime)));
+        }, oneHour - (now - parseInt(lastOrderTime)));
         return () => clearTimeout(timeout);
       }
     }
@@ -103,20 +104,20 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'
-      }`}
-    >
-     {showOrderMessage && (
-  <div className="absolute top-20  left-2/3 transform -translate-x-5/4 mt-0bg-green-600 text-white text-sm font-medium px-5 py-1 rounded-full shadow-lg animate-slide-down z-50">
-    <div className="flex items-center space-x-2">
-      <AlertCircle size={10} className="text-white" />
-      <span>🚚 reste joignable. Merci</span>
-    </div>
-  </div>
-)}
-
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'}`}>
+      
+      {/* ✅ Message affiché pendant 1 heure après commande */}
+      {showOrderMessage && (
+        <div
+          className="fixed z-50 bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-full shadow-md flex items-center space-x-2 max-w-xs w-fit
+          left-1/2 transform -translate-x-1/2
+          md:top-20 md:left-2/3 md:translate-x-0 md:transform-none
+          bottom-4 md:bottom-auto text-center"
+        >
+          <AlertCircle size={14} className="text-white" />
+          <span>🚚 Reste joignable. Merci</span>
+        </div>
+      )}
 
       <div className="container-custom flex items-center justify-between">
         <Link to="/" className="flex items-center text-primary">
@@ -126,6 +127,7 @@ const Header: React.FC = () => {
           <span className="text-2xl font-bold">AValide</span>
         </Link>
 
+        {/* 🔍 Barre de recherche desktop */}
         <div className="hidden md:block flex-1 max-w-md mx-4 relative">
           <form onSubmit={handleSearch}>
             <input
@@ -155,6 +157,7 @@ const Header: React.FC = () => {
           )}
         </div>
 
+        {/* 📱 Menu desktop */}
         <nav className="hidden md:flex items-center space-x-6">
           <Link to="/" className="nav-link">Accueil</Link>
 
@@ -197,6 +200,7 @@ const Header: React.FC = () => {
           </Link>
         </nav>
 
+        {/* 📱 Boutons mobile */}
         <div className="md:hidden flex items-center space-x-4">
           <Link to="/cart" className="relative" aria-label="Voir le panier">
             <ShoppingCart size={22} />
@@ -211,11 +215,12 @@ const Header: React.FC = () => {
             aria-label="Menu mobile"
             className="focus:outline-none"
           >
-            {isMobileMenuOpen ? <Menu size={24} /> : <Menu size={24} />}
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </div>
 
+      {/* 📱 Menu mobile */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200 px-4 py-4 shadow z-50">
           <form onSubmit={handleSearch} className="relative mb-3">
@@ -226,18 +231,14 @@ const Header: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button
-              type="submit"
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-              aria-label="Rechercher"
-            >
+            <button type="submit" className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500" aria-label="Rechercher">
               <Search size={18} />
             </button>
           </form>
 
           {suggestions.length > 0 && (
             <div className="bg-white border border-gray-300 rounded-md shadow-md max-h-60 overflow-y-auto">
-              {suggestions.map((product) => (
+              {suggestions.map(product => (
                 <div
                   key={product.id}
                   onClick={() => {
