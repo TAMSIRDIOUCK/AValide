@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Base styles */
 @layer base {
   :root {
     font-family: 'Inter', system-ui, sans-serif;
@@ -29,6 +30,7 @@
   }
 }
 
+/* Components layer */
 @layer components {
   .container-custom {
     @apply container mx-auto px-4 sm:px-6 lg:px-8;
@@ -64,5 +66,23 @@
 
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* Custom animation utilities */
+@layer utilities {
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -20px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.4s ease-out;
   }
 }

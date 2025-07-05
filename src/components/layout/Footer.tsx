@@ -33,16 +33,7 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Liens Rapides</h3>
-            <ul className="space-y-2 text-neutral-300">
-              <li><Link to="/" className="hover:text-primary transition-colors">Accueil</Link></li>
-              <li><Link to="/categories" className="hover:text-primary transition-colors">Catégories</Link></li>
-              <li><Link to="/sell" className="hover:text-primary transition-colors">Vendre sur AValide</Link></li>
-              <li><Link to="/about" className="hover:text-primary transition-colors">À propos de nous</Link></li>
-            </ul>
-          </div>
+         
 
           {/* Customer Support */}
           <div>

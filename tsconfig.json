@@ -16,7 +16,9 @@
       ]
     },
     "types": [
-      "node"
+      "node",
+      "react",
+      "react-dom"
     ],
     "target": "ES2017",
     "lib": [
@@ -36,12 +38,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve"
-    
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    "**/*.css",
+    "**/*.scss",
+    "**/*.sass"
   ],
   "exclude": [
     "node_modules"

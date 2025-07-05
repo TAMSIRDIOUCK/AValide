@@ -1,3 +1,4 @@
+// src/components/checkout/CheckoutForm.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
@@ -85,6 +86,9 @@ const CheckoutForm: React.FC = () => {
 
       const { error: itemError } = await supabase.from('order_items').insert(orderItems);
       if (itemError) throw new Error(`Erreur insertion articles : ${itemError.message}`);
+
+      // ✅ 3. Marqueur de commande réussie pour l'affichage du message dans le header
+      localStorage.setItem('lastOrderTime', Date.now().toString());
 
       // ✅ Confirmation
       setShowConfirmation(true);

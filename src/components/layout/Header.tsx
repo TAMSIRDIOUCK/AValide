@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Menu, X, Search } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, Search, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { supabase } from '../../lib/supabaseClient';
@@ -12,6 +12,7 @@ const Header: React.FC = () => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
+  const [showOrderMessage, setShowOrderMessage] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
   const { cartItems } = useCart();
@@ -73,6 +74,22 @@ const Header: React.FC = () => {
     setSuggestions(filtered.slice(0, 5));
   }, [searchQuery, allProducts]);
 
+  useEffect(() => {
+    const lastOrderTime = localStorage.getItem('lastOrderTime');
+    if (lastOrderTime) {
+      const now = Date.now();
+      const twoHours = 2 * 60 * 60 * 1000;
+      if (now - parseInt(lastOrderTime) < twoHours) {
+        setShowOrderMessage(true);
+        const timeout = setTimeout(() => {
+          setShowOrderMessage(false);
+          localStorage.removeItem('lastOrderTime');
+        }, twoHours - (now - parseInt(lastOrderTime)));
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -91,8 +108,17 @@ const Header: React.FC = () => {
         isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'
       }`}
     >
+     {showOrderMessage && (
+  <div className="absolute top-20  left-2/3 transform -translate-x-5/4 mt-0bg-green-600 text-white text-sm font-medium px-5 py-1 rounded-full shadow-lg animate-slide-down z-50">
+    <div className="flex items-center space-x-2">
+      <AlertCircle size={10} className="text-white" />
+      <span>🚚 reste joignable. Merci</span>
+    </div>
+  </div>
+)}
+
+
       <div className="container-custom flex items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="flex items-center text-primary">
           <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" className="mr-2">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
@@ -100,7 +126,6 @@ const Header: React.FC = () => {
           <span className="text-2xl font-bold">AValide</span>
         </Link>
 
-        {/* Desktop Search */}
         <div className="hidden md:block flex-1 max-w-md mx-4 relative">
           <form onSubmit={handleSearch}>
             <input
@@ -130,7 +155,6 @@ const Header: React.FC = () => {
           )}
         </div>
 
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6">
           <Link to="/" className="nav-link">Accueil</Link>
 
@@ -173,7 +197,6 @@ const Header: React.FC = () => {
           </Link>
         </nav>
 
-        {/* Mobile Menu Button */}
         <div className="md:hidden flex items-center space-x-4">
           <Link to="/cart" className="relative" aria-label="Voir le panier">
             <ShoppingCart size={22} />
@@ -193,7 +216,6 @@ const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200 px-4 py-4 shadow z-50">
           <form onSubmit={handleSearch} className="relative mb-3">
