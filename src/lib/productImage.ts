@@ -44,5 +44,8 @@ export const uploadProductImages = async (files: File[]): Promise<string[]> => {
     urls.push(publicUrlData.publicUrl);
   }
 
+  // Ajout d'un signe pour indiquer qu'il est possible de défiler
+  console.log('Défilez pour voir plus de produits si disponible.');
+
   return urls;
 };

@@ -50,7 +50,7 @@ const FaqPage = () => {
           <p>
             Actuellement, nous proposons :
             <ul className="list-disc pl-5 mt-2">
-              <li><strong>WAV</strong> (wallet numérique local, rapide et sécurisé)</li>
+              <li><strong>AValide_pay</strong> (wallet numérique local, rapide et sécurisé)</li>
               <li><strong>À la livraison</strong> (paiement en espèces à réception)</li>
             </ul>
             Nous travaillons à intégrer d'autres moyens de paiement très bientôt.

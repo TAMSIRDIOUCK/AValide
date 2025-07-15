@@ -12,17 +12,17 @@ const testimonials = [
   },
   {
     id: 2,
-    name: 'Isabelle',
+    name: 'lahade',
     role: 'Vendeuse',
-    avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    avatar: 'https://images.unsplash.com/photo-1679480947835-04047659c01a?q=80&w=1000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     content: 'Depuis que j\'ai commencé à vendre sur AValide, mon entreprise a connu une croissance incroyable. La plateforme est facile à utiliser et l\'équipe de support est très réactive.',
     rating: 5
   },
   {
     id: 3,
-    name: 'Omar',
+    name: 'icha',
     role: 'Acheteur',
-    avatar: 'https://images.pexels.com/photos/2379005/pexels-photo-2379005.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+    avatar: 'https://img.freepik.com/psd-premium/portrait-femme-noire-fond-transparent_1085577-81910.jpg',
     content: 'Je suis impressionné par la qualité des produits et la fiabilité du service. Le paiement à la livraison m\'a convaincu d\'essayer, et je ne regrette pas mon choix !',
     rating: 4
   }

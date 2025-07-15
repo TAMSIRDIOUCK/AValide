@@ -84,6 +84,23 @@ const FeaturedProducts: React.FC = () => {
 
   return (
     <section className="py-16 bg-gray-50">
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .dot-indicators {
+          display: flex;
+          justify-content: center;
+          gap: 4px;
+          margin-top: 6px;
+        }
+        .dot-indicator {
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background-color: #d1d5db;
+        }
+      `}</style>
+
       <div className="container-custom px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Produits en Vedette</h2>
@@ -123,8 +140,8 @@ const FeaturedProducts: React.FC = () => {
                     </button>
 
                     {/* Images */}
-                    <div className="w-full h-80 overflow-hidden rounded-t-xl relative">
-                      <div className="flex overflow-x-auto snap-x snap-mandatory h-full">
+                    <div className="relative w-full h-80 overflow-hidden rounded-t-xl">
+                      <div className="flex overflow-x-auto snap-x snap-mandatory h-full scroll-smooth scrollbar-hide">
                         {product.images.map((img, idx) => (
                           <img
                             key={idx}
@@ -135,9 +152,17 @@ const FeaturedProducts: React.FC = () => {
                           />
                         ))}
                       </div>
+
+                      {product.images.length > 1 && (
+                        <div className="dot-indicators absolute bottom-2 left-1/2 -translate-x-1/2">
+                          {product.images.map((_, i) => (
+                            <div key={i} className="dot-indicator"></div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Infos */}
+                    {/* Infos produit */}
                     <div className="p-4">
                       <Link to={`/products/${product.id}`} className="block">
                         <h3 className="font-semibold text-lg mb-1 hover:text-primary transition-colors truncate">

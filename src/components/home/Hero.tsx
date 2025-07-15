@@ -4,10 +4,26 @@ import { FaVolumeMute, FaVolumeUp } from 'react-icons/fa';
 
 const Hero: React.FC = () => {
   const videoAds = [
-    { id: 1, src: "/videos/v09044g40000chmhjtrc77u2nr6r4bjg.MP4" },
-    { id: 2, src: "/videos/v09044g40000cqgjl1vog65h43efqcc0.MP4" },
-    { id: 3, src: "/videos/v09044g40000cufkbufog65rnn06q2q0.MP4" },
-    { id: 4, src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4" },
+    {
+      id: 1,
+      src: "/videos/v09044g40000chmhjtrc77u2nr6r4bjg.MP4",
+      poster: "/videos/IMG_1327.jpg",
+    },
+    {
+      id: 2,
+      src: "/videos/v09044g40000cqgjl1vog65h43efqcc0.MP4",
+      poster: "/videos/IMG_1328.jpg",
+    },
+    {
+      id: 3,
+      src: "/videos/v09044g40000cufkbufog65rnn06q2q0.MP4",
+      poster: "/videos/IMG_1329.jpg",
+    },
+    {
+      id: 4,
+      src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4",
+      poster: "/videos/IMG_1330.jpg",
+    },
   ];
 
   const videoRefs = useRef<HTMLVideoElement[]>([]);
@@ -17,12 +33,12 @@ const Hero: React.FC = () => {
 
   const location = useLocation();
 
-  // ✅ Restaurer scroll si on revient sur cette section
+  // Restaurer scroll si on revient
   useEffect(() => {
-    const savedPosition = sessionStorage.getItem('homeScrollPos');
-    if (savedPosition && location.pathname === '/') {
+    const savedPosition = sessionStorage.getItem("homeScrollPos");
+    if (savedPosition && location.pathname === "/") {
       window.scrollTo(0, parseInt(savedPosition, 10));
-      sessionStorage.removeItem('homeScrollPos');
+      sessionStorage.removeItem("homeScrollPos");
     }
   }, [location.pathname]);
 
@@ -60,9 +76,8 @@ const Hero: React.FC = () => {
     };
   }, []);
 
-  // ✅ Fonction pour sauvegarder la position avant navigation
   const saveScrollPosition = () => {
-    sessionStorage.setItem('homeScrollPos', window.scrollY.toString());
+    sessionStorage.setItem("homeScrollPos", window.scrollY.toString());
   };
 
   return (
@@ -72,30 +87,36 @@ const Hero: React.FC = () => {
       </div>
 
       <div className="relative container-custom py-16 md:py-24">
-        {/* Présentation */}
+        {/* Texte principal */}
         <div className="max-w-2xl">
           <h1 className="text-4xl md:text-4xl font-bold text-white leading-tight mb-4 animate-slide-up">
             Achetez et Vendez au Sénégal <br />
             Facilement et en Sécurité
           </h1>
-          <p className="text-lg md:text-xl text-white opacity-90 mb-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          Paiement par AValide_pay ou à la livraison.
+          <p
+            className="text-lg md:text-xl text-white opacity-90 mb-8 animate-slide-up"
+            style={{ animationDelay: "0.1s" }}
+          >
+            Paiement par AValide_pay ou à la livraison.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <div
+            className="flex flex-col sm:flex-row gap-4 animate-slide-up"
+            style={{ animationDelay: "0.2s" }}
+          >
             <a
               href="#categories"
               className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
               onClick={saveScrollPosition}
             >
-              acheter
+              Acheter
             </a>
             <Link
               to="/seller/dashboard"
               onClick={saveScrollPosition}
               className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
             >
-               Vendre
+              Vendre
             </Link>
           </div>
         </div>
@@ -106,7 +127,10 @@ const Hero: React.FC = () => {
 
           <div className="flex overflow-x-auto space-x-4 snap-x snap-mandatory scrollbar-hide pb-4">
             {videoAds.map((video, index) => (
-              <div key={video.id} className="relative snap-center flex-shrink-0 w-full md:w-[500px]">
+              <div
+                key={video.id}
+                className="relative snap-center flex-shrink-0 w-full md:w-[500px]"
+              >
                 <video
                   ref={(el) => {
                     if (el) videoRefs.current[index] = el;
@@ -115,6 +139,7 @@ const Hero: React.FC = () => {
                   loop
                   muted={mutedStates[index]}
                   className="w-full h-64 md:h-80 rounded-lg object-cover border-2 border-white"
+                  poster={video.poster} // ✅ image affichée avant le chargement
                   playsInline
                   controls={false}
                 />
@@ -122,7 +147,11 @@ const Hero: React.FC = () => {
                   onClick={() => toggleMute(index)}
                   className="absolute bottom-3 right-3 p-2 bg-white bg-opacity-80 rounded-full text-primary hover:bg-primary hover:text-white transition"
                 >
-                  {mutedStates[index] ? <FaVolumeMute size={20} /> : <FaVolumeUp size={20} />}
+                  {mutedStates[index] ? (
+                    <FaVolumeMute size={20} />
+                  ) : (
+                    <FaVolumeUp size={20} />
+                  )}
                 </button>
               </div>
             ))}

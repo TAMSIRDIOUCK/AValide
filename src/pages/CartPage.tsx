@@ -1,8 +1,8 @@
-// src/pages/CartPage.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import CartItem from '../components/cart/CartItem';
+import ProductCard from '../components/products/ProductCard';
 import { useCart } from '../context/CartContext';
 import { formatPrice } from '../utils/formatters';
 import { ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react';
@@ -11,8 +11,23 @@ const CartPage: React.FC = () => {
   const { cartItems, clearCart } = useCart();
   const total = cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
 
+  const [likedProducts, setLikedProducts] = useState<any[]>([]);
+
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    // ✅ Récupère les produits likés depuis localStorage
+    const storedLikes = localStorage.getItem('likedProducts');
+    if (storedLikes) {
+      try {
+        const parsed = JSON.parse(storedLikes);
+        if (Array.isArray(parsed)) {
+          setLikedProducts(parsed);
+        }
+      } catch (error) {
+        console.error('Erreur parsing produits likés :', error);
+      }
+    }
   }, []);
 
   return (
@@ -98,6 +113,18 @@ const CartPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ✅ Section produits aimés */}
+      {likedProducts.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
+          <h2 className="text-xl font-semibold mb-6 text-center mt-10">Produits que vous aimez</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {likedProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
