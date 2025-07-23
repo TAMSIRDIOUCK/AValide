@@ -74,7 +74,6 @@ const Header: React.FC = () => {
     setSuggestions(filtered.slice(0, 5));
   }, [searchQuery, allProducts]);
 
-  // ✅ Affiche le message pendant 1 heure après la commande
   useEffect(() => {
     const lastOrderTime = localStorage.getItem('lastOrderTime');
     if (lastOrderTime) {
@@ -105,8 +104,6 @@ const Header: React.FC = () => {
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-md py-2' : 'bg-transparent py-4'}`}>
-      
-      {/* ✅ Message affiché pendant 1 heure après commande */}
       {showOrderMessage && (
         <div
           className="fixed z-50 bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-full shadow-md flex items-center space-x-2 max-w-xs w-fit
@@ -121,13 +118,10 @@ const Header: React.FC = () => {
 
       <div className="container-custom flex items-center justify-between">
         <Link to="/" className="flex items-center text-primary">
-          <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" className="mr-2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-          </svg>
+          <img src="/videos/IMG_1696.jpg" alt="Logo AValide" className="w-10 h-10 rounded-full mr-2 object-cover" />
           <span className="text-2xl font-bold">AValide</span>
         </Link>
 
-        {/* 🔍 Barre de recherche desktop */}
         <div className="hidden md:block flex-1 max-w-md mx-4 relative">
           <form onSubmit={handleSearch}>
             <input
@@ -157,7 +151,6 @@ const Header: React.FC = () => {
           )}
         </div>
 
-        {/* 📱 Menu desktop */}
         <nav className="hidden md:flex items-center space-x-6">
           <Link to="/" className="nav-link">Accueil</Link>
 
@@ -200,7 +193,6 @@ const Header: React.FC = () => {
           </Link>
         </nav>
 
-        {/* 📱 Boutons mobile */}
         <div className="md:hidden flex items-center space-x-4">
           <Link to="/cart" className="relative" aria-label="Voir le panier">
             <ShoppingCart size={22} />
@@ -220,7 +212,6 @@ const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* 📱 Menu mobile */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200 px-4 py-4 shadow z-50">
           <form onSubmit={handleSearch} className="relative mb-3">
