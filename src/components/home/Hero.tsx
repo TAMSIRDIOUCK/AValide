@@ -6,24 +6,41 @@ const Hero: React.FC = () => {
   const videoAds = [
     {
       id: 1,
-      src: "/videos/v09044g40000chmhjtrc77u2nr6r4bjg.MP4",
-      poster: "/videos/IMG_1327.jpg",
+      src: "/videos/ScreenRecording_07-25-2025 01-47-46_1.mov",
+      poster: "/videos/IMG_1706.jpg",
     },
     {
       id: 2,
-      src: "/videos/v09044g40000cqgjl1vog65h43efqcc0.MP4",
-      poster: "/videos/IMG_1328.jpg",
+      src: "/videos/ScreenRecording_07-25-2025 02-07-18_1.mov",
+      poster: "/videos/IMG_1712.jpg",
     },
     {
       id: 3,
-      src: "/videos/v09044g40000cufkbufog65rnn06q2q0.MP4",
-      poster: "/videos/IMG_1329.jpg",
+      src: "/videos/ScreenRecording_07-25-2025 02-11-38_1.mov",
+      poster: "/videos/IMG_1721.jpg",
     },
     {
       id: 4,
       src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4",
       poster: "/videos/IMG_1330.jpg",
     },
+  ];
+
+  const featuredImages = [
+    "/videos/IMG_1706.jpg",
+    "/videos/IMG_1707.jpg",
+    "/videos/IMG_1708.jpg",
+    "/videos/IMG_1710.jpg",
+    "/videos/IMG_1711.jpg",
+    "/videos/IMG_1712.jpg",
+    "/videos/IMG_1713.jpg",
+    "/videos/IMG_1716.jpg",
+    "/videos/IMG_1717.jpg",
+    "/videos/IMG_1718.jpg",
+    "/videos/IMG_1719.jpg",
+    "/videos/IMG_1720.jpg",
+    "/videos/IMG_1721.jpg",
+    // Tu peux en ajouter autant que tu veux ici
   ];
 
   const videoRefs = useRef<HTMLVideoElement[]>([]);
@@ -33,7 +50,6 @@ const Hero: React.FC = () => {
 
   const location = useLocation();
 
-  // Restaurer scroll si on revient
   useEffect(() => {
     const savedPosition = sessionStorage.getItem("homeScrollPos");
     if (savedPosition && location.pathname === "/") {
@@ -81,79 +97,74 @@ const Hero: React.FC = () => {
   };
 
   return (
-    <div className="relative bg-gradient-to-r from-primary-dark to-primary overflow-hidden">
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-dark to-primary opacity-90"></div>
+    <div className="bg-white">
+      {/* Vidéos publicitaires */}
+      <div className="w-full overflow-x-auto flex space-x-4 snap-x snap-mandatory scrollbar-hide">
+        {videoAds.map((video, index) => (
+          <div key={video.id} className="snap-center flex-shrink-0 w-full md:w-[500px] relative">
+            <video
+              ref={(el) => {
+                if (el) videoRefs.current[index] = el;
+              }}
+              src={video.src}
+              loop
+              muted={mutedStates[index]}
+              className="w-full h-64 md:h-80 object-cover"
+              poster={video.poster}
+              playsInline
+              controls={false}
+            />
+            <button
+              onClick={() => toggleMute(index)}
+              className="absolute bottom-3 right-3 p-2 bg-white bg-opacity-80 rounded-full text-primary hover:bg-primary hover:text-white transition"
+            >
+              {mutedStates[index] ? <FaVolumeMute size={20} /> : <FaVolumeUp size={20} />}
+            </button>
+          </div>
+        ))}
       </div>
 
-      <div className="relative container-custom py-16 md:py-24">
-        {/* Texte principal */}
-        <div className="max-w-2xl">
-          <h1 className="text-4xl md:text-4xl font-bold text-white leading-tight mb-4 animate-slide-up">
-            Achetez et Vendez au Sénégal <br />
-            Facilement et en Sécurité
-          </h1>
-          <p
-            className="text-lg md:text-xl text-white opacity-90 mb-8 animate-slide-up"
-            style={{ animationDelay: "0.1s" }}
-          >
-            Paiement par AValide_pay ou à la livraison.
-          </p>
+      {/* Texte + boutons */}
+      <div className="container-custom py-10 text-center">
+        <h1 className="text-2xl md:text-3xl font-bold text-black mb-4">
+          Achetez et Vendez au Sénégal Facilement et en Sécurité
+        </h1>
+        <p className="text-base md:text-lg text-gray-700 mb-6">
+          Paiement par AValide_pay ou à la livraison.
+        </p>
 
-          <div
-            className="flex flex-col sm:flex-row gap-4 animate-slide-up"
-            style={{ animationDelay: "0.2s" }}
+        <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <a
+            href="#categories"
+            onClick={saveScrollPosition}
+            className="px-6 py-3 bg-green-600 text-white font-semibold rounded-2xl shadow hover:bg-green-700 transition"
           >
-            <a
-              href="#categories"
-              className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
-              onClick={saveScrollPosition}
-            >
-              Acheter
-            </a>
-            <Link
-              to="/seller/dashboard"
-              onClick={saveScrollPosition}
-              className="inline-block px-6 py-3 bg-white text-primary font-semibold border border-primary rounded-2xl shadow hover:bg-primary hover:text-white transition duration-300 text-center"
-            >
-              Vendre
-            </Link>
-          </div>
+            Acheter
+          </a>
+          <Link
+            to="/seller/dashboard"
+            onClick={saveScrollPosition}
+            className="px-6 py-3 bg-green-600 text-white font-semibold rounded-2xl shadow hover:bg-green-700 transition"
+          >
+            Vendre
+          </Link>
         </div>
+      </div>
 
-        {/* Vidéos publicitaires */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-semibold text-white mb-4">Publicités en vedette</h2>
-
-          <div className="flex overflow-x-auto space-x-4 snap-x snap-mandatory scrollbar-hide pb-4">
-            {videoAds.map((video, index) => (
-              <div
-                key={video.id}
-                className="relative snap-center flex-shrink-0 w-full md:w-[500px]"
-              >
-                <video
-                  ref={(el) => {
-                    if (el) videoRefs.current[index] = el;
-                  }}
-                  src={video.src}
-                  loop
-                  muted={mutedStates[index]}
-                  className="w-full h-64 md:h-80 rounded-lg object-cover border-2 border-white"
-                  poster={video.poster} // ✅ image affichée avant le chargement
-                  playsInline
-                  controls={false}
-                />
-                <button
-                  onClick={() => toggleMute(index)}
-                  className="absolute bottom-3 right-3 p-2 bg-white bg-opacity-80 rounded-full text-primary hover:bg-primary hover:text-white transition"
-                >
-                  {mutedStates[index] ? (
-                    <FaVolumeMute size={20} />
-                  ) : (
-                    <FaVolumeUp size={20} />
-                  )}
-                </button>
-              </div>
+      {/* Produits en vedette - défilement automatique & manuel */}
+      <div className="bg-white pt-4 pb-0 -mb-4">
+        <h2 className="text-xl md:text-2xl font-semibold text-center text-gray-800 mb-4">
+          Produits en vedette
+        </h2>
+        <div className="overflow-x-auto whitespace-nowrap scrollbar-hide relative">
+          <div className="flex gap-4 px-4 animate-slide-horizontal hover:pause">
+            {featuredImages.concat(featuredImages).map((src, index) => (
+              <img
+                key={index}
+                src={src}
+                alt={`Produit ${index + 1}`}
+                className="h-48 w-auto object-contain flex-shrink-0 rounded-xl transition-transform duration-300 hover:scale-105"
+              />
             ))}
           </div>
         </div>
