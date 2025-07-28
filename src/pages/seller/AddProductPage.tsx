@@ -9,7 +9,7 @@ import Layout from '../../components/layout/Layout';
 import { categories } from '../../data/categories';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { uploadProductImages } from '../../lib/productImage'; // ✅ importe ici
+import { uploadProductImages } from '../../lib/productImage'; // ✅ import ici
 
 const AddProductPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,15 +53,20 @@ const AddProductPage: React.FC = () => {
       return;
     }
 
-    if (!title || !description || !price || !stock || !category) {
-      alert("Tous les champs sont obligatoires.");
+    if (!title.trim() || !description.trim() || !price || !stock || !category) {
+      alert("Tous les champs (nom, description, prix, stock, catégorie) sont obligatoires.");
+      return;
+    }
+
+    if (files.length < 2) {
+      alert("Veuillez ajouter au moins 2 images pour publier le produit.");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const imageUrls = await uploadProductImages(files); // ✅ utilise la fonction propre
+      const imageUrls = await uploadProductImages(files);
 
       const { error } = await supabase.from('products').insert([
         {
@@ -103,35 +108,88 @@ const AddProductPage: React.FC = () => {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="text" placeholder="Nom du produit" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 border rounded" required />
-          <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} className="w-full p-2 border rounded" required />
-          <input type="number" placeholder="Prix" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded" min={0} required />
-          <input type="number" placeholder="Stock" value={stock} onChange={e => setStock(e.target.value)} className="w-full p-2 border rounded" min={0} required />
+          <input
+            type="text"
+            placeholder="Nom du produit"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full p-2 border rounded"
+            required
+          />
+          <textarea
+            placeholder="Description"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            className="w-full p-2 border rounded"
+            required
+          />
+          <input
+            type="number"
+            placeholder="Prix"
+            value={price}
+            onChange={e => setPrice(e.target.value)}
+            className="w-full p-2 border rounded"
+            min={0}
+            required
+          />
+          <input
+            type="number"
+            placeholder="Stock"
+            value={stock}
+            onChange={e => setStock(e.target.value)}
+            className="w-full p-2 border rounded"
+            min={0}
+            required
+          />
 
-          <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-2 border rounded" required>
+          <select
+            value={category}
+            onChange={e => setCategory(e.target.value)}
+            className="w-full p-2 border rounded"
+            required
+          >
             <option value="">Sélectionnez une catégorie</option>
             {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
             ))}
           </select>
 
-          <div {...getRootProps()} className="border-2 border-dashed border-gray-400 p-4 rounded cursor-pointer text-center">
+          <div
+            {...getRootProps()}
+            className="border-2 border-dashed border-gray-400 p-4 rounded cursor-pointer text-center"
+          >
             <input {...getInputProps()} />
-            {isDragActive ? <p>Déposez les images ici...</p> : <p className="flex items-center justify-center gap-2"><Upload className="w-5 h-5" /> Glissez-déposez des images ou cliquez pour sélectionner</p>}
+            {isDragActive ? (
+              <p>Déposez les images ici...</p>
+            ) : (
+              <p className="flex items-center justify-center gap-2">
+                <Upload className="w-5 h-5" /> Glissez-déposez des images ou cliquez pour sélectionner
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-4 mt-4">
             {previewUrls.map((url, index) => (
               <div key={index} className="relative">
                 <img src={url} alt={`preview-${index}`} className="w-24 h-24 object-cover rounded" />
-                <button type="button" onClick={() => removeImage(index)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => removeImage(index)}
+                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                >
                   <X size={16} />
                 </button>
               </div>
             ))}
           </div>
 
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50" disabled={isSubmitting}>
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+            disabled={isSubmitting}
+          >
             {isSubmitting ? 'Publication...' : 'Publier le produit'}
           </button>
         </form>
