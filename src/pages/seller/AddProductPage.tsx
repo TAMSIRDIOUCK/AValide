@@ -9,7 +9,7 @@ import Layout from '../../components/layout/Layout';
 import { categories } from '../../data/categories';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { uploadProductImages } from '../../lib/productImage'; // ✅ import ici
+import { uploadProductImages } from '../../lib/productImage';
 
 const AddProductPage: React.FC = () => {
   const navigate = useNavigate();
@@ -33,8 +33,8 @@ const AddProductPage: React.FC = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
-    maxFiles: 5,
-    maxSize: 5 * 1024 * 1024,
+    maxFiles: 20, // accepte toutes les images d’un produit
+    maxSize: 20 * 1024 * 1024, // taille max 20MB par image
   });
 
   const removeImage = (index: number) => {
@@ -165,7 +165,7 @@ const AddProductPage: React.FC = () => {
               <p>Déposez les images ici...</p>
             ) : (
               <p className="flex items-center justify-center gap-2">
-                <Upload className="w-5 h-5" /> Glissez-déposez des images ou cliquez pour sélectionner
+                <Upload className="w-5 h-5" /> Glissez-déposez vos images ou cliquez pour sélectionner
               </p>
             )}
           </div>
