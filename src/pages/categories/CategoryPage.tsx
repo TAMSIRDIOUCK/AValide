@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
-import { Product } from '../../types';
+import { Product } from '../../types/types';
 import Layout from '../../components/layout/Layout';
 import { supabase } from '../../lib/supabaseClient';
 import { Heart } from 'lucide-react';
@@ -175,11 +175,12 @@ const CategoryPage = () => {
                 {/* Carousel d’image */}
                 <div className="w-full h-80 overflow-hidden rounded-t-xl relative">
                   <div className="flex overflow-x-auto snap-x snap-mandatory h-full">
-                    {product.images.map((img, idx) => (
+                    {product.images.map((img: string, idx: number) => (
                       <img
                         key={idx}
                         src={img}
                         alt={`${product.title} ${idx + 1}`}
+                        loading="lazy"
                         className="snap-center flex-shrink-0 w-full h-full object-cover"
                         style={{ minWidth: '100%' }}
                       />

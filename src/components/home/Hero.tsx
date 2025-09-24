@@ -113,6 +113,7 @@ const Hero: React.FC = () => {
               poster={video.poster}
               playsInline
               controls={false}
+              preload="metadata"
             />
             <button
               onClick={() => toggleMute(index)}

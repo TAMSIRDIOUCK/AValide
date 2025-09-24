@@ -24,3 +24,18 @@ export interface Order {
     customerAddress: string;
   }[];
 }
+
+export interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  images: string[];
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  category: string;
+  sellerId: string;
+  stock: number;
+  likes: number;
+}
