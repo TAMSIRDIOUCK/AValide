@@ -1,6 +1,6 @@
 // 📁 utils/orderService.ts
 import { supabase } from '../lib/supabaseClient';
-import { Order } from '../types';
+import { Order } from '../types/types';
 
 ////////////////////////////////////////////////////////////////////////////////
 // Mappe une commande Supabase en objet Order
