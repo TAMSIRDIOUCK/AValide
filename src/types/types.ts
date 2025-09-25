@@ -31,11 +31,13 @@ export interface Product {
   description: string;
   price: number;
   images: string[];
+  images_urls?: string[];
   rating: number;
   reviewCount: number;
   createdAt: string;
   category: string;
   sellerId: string;
+  sellerName?: string; // Ajout de la propriété optionnelle sellerName
   stock: number;
   likes: number;
 }

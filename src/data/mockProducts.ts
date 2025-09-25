@@ -1,4 +1,4 @@
-import { Product } from '../types';
+import { Product } from '../types/types';
 
 export const mockProducts: Product[] = [
   {
@@ -16,7 +16,8 @@ export const mockProducts: Product[] = [
     rating: 4.7,
     reviewCount: 128,
     stock: 15,
-    createdAt: '2023-12-15T10:30:00Z'
+    createdAt: '2023-12-15T10:30:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '2',
@@ -32,7 +33,8 @@ export const mockProducts: Product[] = [
     rating: 4.9,
     reviewCount: 56,
     stock: 8,
-    createdAt: '2023-12-20T14:15:00Z'
+    createdAt: '2023-12-20T14:15:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '3',
@@ -48,7 +50,8 @@ export const mockProducts: Product[] = [
     rating: 4.8,
     reviewCount: 32,
     stock: 3,
-    createdAt: '2023-11-05T09:45:00Z'
+    createdAt: '2023-11-05T09:45:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '4',
@@ -64,7 +67,8 @@ export const mockProducts: Product[] = [
     rating: 4.6,
     reviewCount: 98,
     stock: 999,
-    createdAt: '2024-01-10T13:20:00Z'
+    createdAt: '2024-01-10T13:20:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '5',
@@ -80,7 +84,8 @@ export const mockProducts: Product[] = [
     rating: 4.9,
     reviewCount: 45,
     stock: 20,
-    createdAt: '2024-02-01T11:10:00Z'
+    createdAt: '2024-02-01T11:10:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '6',
@@ -96,7 +101,8 @@ export const mockProducts: Product[] = [
     rating: 4.7,
     reviewCount: 67,
     stock: 12,
-    createdAt: '2024-01-25T16:30:00Z'
+    createdAt: '2024-01-25T16:30:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '7',
@@ -112,7 +118,8 @@ export const mockProducts: Product[] = [
     rating: 4.5,
     reviewCount: 23,
     stock: 5,
-    createdAt: '2023-12-05T08:45:00Z'
+    createdAt: '2023-12-05T08:45:00Z',
+    likes: 0 // Ajout de la propriété manquante
   },
   {
     id: '8',
@@ -128,6 +135,7 @@ export const mockProducts: Product[] = [
     rating: 4.8,
     reviewCount: 41,
     stock: 7,
-    createdAt: '2024-01-15T10:20:00Z'
+    createdAt: '2024-01-15T10:20:00Z',
+    likes: 0 // Ajout de la propriété manquante
   }
 ];

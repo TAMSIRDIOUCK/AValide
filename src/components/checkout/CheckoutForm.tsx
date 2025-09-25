@@ -111,7 +111,7 @@ const CheckoutForm: React.FC = () => {
 
       {!showConfirmation && (
         <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
             {/* Infos client */}
             <div>
               <h3 className="text-lg font-semibold mb-4">Informations de livraison</h3>

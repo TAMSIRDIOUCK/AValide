@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getAllProductsFromSupabase } from '../../utils/productService';
-import { Product } from '../../types';
+import { Product } from '../../types/types';
 import Layout from '../../components/layout/Layout';
 import { useCart } from '../../context/CartContext';
 import { Heart, Star } from 'lucide-react';
@@ -95,7 +95,7 @@ const SearchResultsPage = () => {
         ) : results.length === 0 ? (
           <p className="text-gray-500 text-center">Aucun produit trouvé.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {results.map(product => (
               <div
                 key={product.id}
@@ -117,7 +117,7 @@ const SearchResultsPage = () => {
                 </button>
 
                 {/* Image carousel */}
-                <div className="w-full h-80 overflow-hidden rounded-t-xl relative">
+                <div className="w-full aspect-w-1 aspect-h-1 overflow-hidden rounded-t-xl relative">
                   <div className="flex overflow-x-auto snap-x snap-mandatory h-full">
                     {(product.images || product.images_urls || []).map((url, index) => (
                       <img
