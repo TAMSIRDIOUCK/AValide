@@ -2,54 +2,53 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Trash, Plus, Minus } from 'lucide-react';
-import { CartItem as CartItemType } from '../../types';
-import { useCart } from '../../context/CartContext';
+import { useCart, CartItem as CartContextItem } from '../../context/CartContext';
+import { ProductVariant } from '../../types/types'; // ✅ Import depuis types.ts
 import { formatPrice } from '../../utils/formatters';
 
 interface CartItemProps {
-  item: CartItemType;
+  item: CartContextItem;
 }
 
 const CartItem: React.FC<CartItemProps> = ({ item }) => {
-  const { updateQuantity, removeItem } = useCart();
-  const { product, quantity } = item;
-  const maxStock = product.stock ?? Infinity;
+  const { updateQuantity, removeItem, updateVariant } = useCart();
+  const { product, quantity, selectedVariant } = item;
+
+  const maxStock = selectedVariant?.stock ?? product.stock ?? Infinity;
 
   const handleIncrement = () => {
     if (quantity < maxStock) {
-      updateQuantity(product.id, quantity + 1);
+      updateQuantity(product.id, quantity + 1, selectedVariant);
     }
   };
 
   const handleDecrement = () => {
     if (quantity > 1) {
-      updateQuantity(product.id, quantity - 1);
+      updateQuantity(product.id, quantity - 1, selectedVariant);
     } else {
-      removeItem(product.id);
+      removeItem(product.id, selectedVariant);
     }
   };
 
   const handleRemove = () => {
-    removeItem(product.id);
+    removeItem(product.id, selectedVariant);
   };
 
-  const imageUrl =
-    Array.isArray(product.images) && product.images.length > 0
-      ? product.images[0]
-      : '/placeholder.jpg';
+  // ✅ Récupération des tailles et couleurs depuis les variantes
+  const availableSizes = product.variants?.map((v: ProductVariant) => v.size) ?? [];
+  const availableColors = product.variants?.map((v: ProductVariant) => v.color) ?? [];
+
+  const price = selectedVariant?.price ?? product.price;
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-b border-gray-200">
       {/* IMAGE + DÉTAILS PRODUIT */}
       <div className="flex items-center gap-4 w-full sm:w-2/5">
         <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-          <img src={imageUrl} alt={product.description} className="w-full h-full object-cover" />
+          <img src={product.images[0]} alt={product.description} className="w-full h-full object-cover" />
         </div>
         <div className="flex flex-col gap-1 overflow-hidden">
-          {/* ✅ Titre du produit en haut en gras */}
-          <span className="font-bold text-sm text-gray-800 line-clamp-1">
-            {product.title}
-          </span>
+          <span className="font-bold text-sm text-gray-800 line-clamp-1">{product.title}</span>
 
           <Link
             to={`/products/${product.id}`}
@@ -58,15 +57,58 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
             {product.description}
           </Link>
 
-          <span className="text-primary font-semibold text-sm">
-            {formatPrice(product.price)}
-          </span>
+          <span className="text-primary font-semibold text-sm">{formatPrice(price)}</span>
+
+          {product.variants && product.variants.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div>
+                <label className="block text-sm font-medium mb-2">Taille</label>
+                <select
+                  value={selectedVariant?.size || ''}
+                  onChange={(e) => {
+                    const newSize = e.target.value;
+                    const newVariant = product.variants?.find(
+                      (v) => v.size === newSize && v.color === selectedVariant?.color
+                    );
+                    if (newVariant) updateVariant(product.id, newVariant);
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  {availableSizes.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Couleur</label>
+                <select
+                  value={selectedVariant?.color || ''}
+                  onChange={(e) => {
+                    const newColor = e.target.value;
+                    const newVariant = product.variants?.find(
+                      (v) => v.color === newColor && v.size === selectedVariant?.size
+                    );
+                    if (newVariant) updateVariant(product.id, newVariant);
+                  }}
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  {availableColors.map((color) => (
+                    <option key={color} value={color}>
+                      {color}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* QUANTITÉ + TOTAL + SUPPRIMER */}
       <div className="flex flex-col sm:flex-row items-center justify-between w-full sm:w-3/5 gap-4">
-        {/* Contrôle de quantité */}
         <div className="flex items-center">
           <button
             onClick={handleDecrement}
@@ -82,7 +124,7 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
             onChange={(e) => {
               const val = parseInt(e.target.value);
               if (!isNaN(val) && val > 0 && val <= maxStock) {
-                updateQuantity(product.id, val);
+                updateQuantity(product.id, val, selectedVariant);
               }
             }}
             className="w-12 mx-2 text-center border border-gray-300 rounded-md p-1"
@@ -102,12 +144,8 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
           </button>
         </div>
 
-        {/* Total par ligne */}
-        <div className="font-semibold text-sm sm:text-base">
-          {formatPrice(product.price * quantity)}
-        </div>
+        <div className="font-semibold text-sm sm:text-base">{formatPrice(price * quantity)}</div>
 
-        {/* Bouton supprimer */}
         <button
           onClick={handleRemove}
           className="text-gray-400 hover:text-red-600 transition"

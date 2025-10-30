@@ -6,27 +6,33 @@ const Hero: React.FC = () => {
   const videoAds = [
     {
       id: 1,
+      src: "/videos/ScreenRecording_10-30-2025 14-11-37_1.mov",
+      poster: "/videos/insMind-2.JPG",
+    },
+    {
+      id: 2,
       src: "/videos/ScreenRecording_07-25-2025 01-47-46_1.mov",
       poster: "/videos/IMG_1706.jpg",
     },
     {
-      id: 2,
+      id: 3,
       src: "/videos/ScreenRecording_07-25-2025 02-07-18_1.mov",
       poster: "/videos/IMG_1712.jpg",
     },
     {
-      id: 3,
+      id: 4,
       src: "/videos/ScreenRecording_07-25-2025 02-11-38_1.mov",
       poster: "/videos/IMG_1721.jpg",
     },
-    {
-      id: 4,
-      src: "/videos/v24044gl0000cuqebffog65qkuqjht9g.MP4",
-      poster: "/videos/IMG_1330.jpg",
-    },
+    
+    
   ];
 
   const featuredImages = [
+    "/videos/InsMindAIModel.JPG",
+    "/videos/insMind-2.JPG",
+    "/videos/IMG_1226.JPEG",
+    "/videos/IMG_1225.JPEG",
     "/videos/IMG_1706.jpg",
     "/videos/IMG_1707.jpg",
     "/videos/IMG_1708.jpg",
@@ -39,7 +45,8 @@ const Hero: React.FC = () => {
     "/videos/IMG_1718.jpg",
     "/videos/IMG_1719.jpg",
     "/videos/IMG_1720.jpg",
-    "/videos/IMG_1721.jpg",
+   
+
     // Tu peux en ajouter autant que tu veux ici
   ];
 

@@ -1,4 +1,5 @@
 // src/App.tsx
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
@@ -21,6 +22,8 @@ import ShippingPage from './pages/ShippingPage';
 import ReturnsPage from './pages/ReturnsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import AddServicePage from './pages/seller/AddServicePage';
+import ServiceDetailPage from './pages/services/ServiceDetailPage'; // Correction de l'import manquant
 
 // Composant de route protégée : exige seulement que l'utilisateur soit connecté
 interface ProtectedRouteProps {
@@ -54,6 +57,15 @@ function App() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/seller/services/add" element={ <ProtectedRoute>
+              <AddServicePage />
+            </ProtectedRoute>} />
+            <Route path="/services/:id" element={
+            <ProtectedRoute>
+              <ServiceDetailPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/checkout"

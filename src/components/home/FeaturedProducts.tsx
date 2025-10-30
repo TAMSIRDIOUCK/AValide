@@ -12,9 +12,10 @@ const FeaturedProducts: React.FC = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('tous');
 
+  // Clé locale pour les produits likés
   const LOCAL_STORAGE_KEY = user ? `likedProducts_${user.id}` : 'likedProducts_guest';
-
   const [likedProducts, setLikedProducts] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -24,12 +25,12 @@ const FeaturedProducts: React.FC = () => {
     }
   });
 
+  // Sauvegarder les likes dans localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(likedProducts));
-    } catch {}
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(likedProducts));
   }, [likedProducts, LOCAL_STORAGE_KEY]);
 
+  // Charger les produits depuis Supabase
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
@@ -50,16 +51,15 @@ const FeaturedProducts: React.FC = () => {
           rating: p.rating || 0,
           reviewCount: p.review_count || 0,
           createdAt: p.created_at,
-          category: p.category || '',
+          category: p.category || 'autre',
           sellerId: p.seller_id,
           stock: p.stock || 0,
-          category_id: p.category_id,
           likes: p.likes || 0,
+          isFromChina: Boolean(p.is_from_china),
         }));
 
         setProducts(adapted);
       }
-
       setLoading(false);
     };
 
@@ -74,52 +74,83 @@ const FeaturedProducts: React.FC = () => {
     );
   };
 
-  const isAlreadyInCart = (productId: string) => {
-    return cartItems.some((item) => item.product.id === productId);
+  const isAlreadyInCart = (productId: string) =>
+    cartItems.some((item) => item.product.id === productId);
+
+  const categoryNames: Record<string, string> = {
+    vetement: 'Vêtements 👕',
+    accessoire: 'Accessoires 💍',
+    meuble: 'Meubles 🪑',
+    enfant: 'Enfants 🧸',
+    chine: 'Produits de Chine 🇨🇳',
+    autre: 'Autres 🛍️',
   };
+
+  const categoriesList = ['vetement', 'accessoire', 'meuble', 'enfant', 'chine', 'autre'];
+
+  const filteredProducts =
+    selectedCategory === 'tous'
+      ? products
+      : products.filter((p) => p.category === selectedCategory);
 
   return (
     <section className="py-16 bg-gray-50">
-      <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .dot-indicators {
-          display: flex;
-          justify-content: center;
-          gap: 4px;
-          margin-top: 6px;
-        }
-        .dot-indicator {
-          width: 6px;
-          height: 6px;
-          border-radius: 9999px;
-          background-color: #d1d5db;
-        }
-      `}</style>
-
       <div className="container-custom px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Produits en Vedette</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Découvrez les derniers produits ajoutés par nos vendeurs.
+            Découvrez les produits populaires de chaque catégorie.
           </p>
         </div>
 
+        {/* Boutons de catégories */}
+        <div className="flex flex-wrap justify-center gap-3 mb-10">
+          <button
+            onClick={() => setSelectedCategory('tous')}
+            className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
+              selectedCategory === 'tous'
+                ? 'bg-primary text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Tous les produits 🌍
+          </button>
+
+          {categoriesList.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
+                selectedCategory === cat
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {categoryNames[cat] || cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Affichage produits */}
         {loading ? (
           <p className="text-center text-gray-500">Chargement des produits...</p>
-        ) : products.length === 0 ? (
-          <p className="text-center text-gray-500">Aucun produit disponible pour le moment.</p>
+        ) : filteredProducts.length === 0 ? (
+          <p className="text-center text-gray-500">Aucun produit dans cette catégorie.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map((product) => {
+            {filteredProducts.map((product) => {
               const inCart = isAlreadyInCart(product.id);
-
               return (
                 <div
                   key={product.id}
                   className="relative group border rounded-xl shadow hover:shadow-lg transition bg-white"
                 >
-                  {/* Like */}
+                  {product.isFromChina && (
+                    <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full shadow">
+                      🇨🇳 Chine
+                    </div>
+                  )}
+
                   <button
                     onClick={() => toggleLike(product.id)}
                     className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white shadow"
@@ -134,9 +165,8 @@ const FeaturedProducts: React.FC = () => {
                     />
                   </button>
 
-                  {/* Images */}
                   <div className="w-full aspect-w-1 aspect-h-1 overflow-hidden rounded-lg">
-                    <div className="flex overflow-x-auto snap-x snap-mandatory h-full scroll-smooth scrollbar-hide">
+                    <div className="flex overflow-x-auto snap-x snap-mandatory h-full scroll-smooth">
                       {product.images.map((img, idx) => (
                         <img
                           key={idx}
@@ -147,22 +177,11 @@ const FeaturedProducts: React.FC = () => {
                         />
                       ))}
                     </div>
-
-                    {product.images.length > 1 && (
-                      <div className="dot-indicators absolute bottom-2 left-1/2 -translate-x-1/2">
-                        {product.images.map((_, i) => (
-                          <div key={i} className="dot-indicator"></div>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Infos produit */}
                   <div className="p-4">
                     <Link to={`/products/${product.id}`} className="block">
-                      <h3 className="font-semibold text-lg mb-1 hover:text-primary transition-colors truncate">
-                        {product.title}
-                      </h3>
+                      <h3 className="font-semibold text-lg mb-1 truncate">{product.title}</h3>
                     </Link>
 
                     <div className="flex items-center mb-2 text-yellow-400">
@@ -171,7 +190,9 @@ const FeaturedProducts: React.FC = () => {
                       ))}
                     </div>
 
-                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">{product.description}</p>
+                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+                      {product.description}
+                    </p>
                     <p className="font-bold text-lg text-primary mb-3">
                       {formatPrice(product.price)}
                     </p>

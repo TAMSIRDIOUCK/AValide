@@ -1,15 +1,18 @@
-// pages/seller/AddProductPage.tsx
-
 import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Package, Upload, X } from 'lucide-react';
+import { Package, Upload, X, Plus, Trash2 } from 'lucide-react';
 
 import Layout from '../../components/layout/Layout';
-import { categories } from '../../data/categories';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { uploadProductImages } from '../../lib/productImage';
+
+interface LocalVariant {
+  size: string;
+  color: string;
+  stock: number;
+}
 
 const AddProductPage: React.FC = () => {
   const navigate = useNavigate();
@@ -23,43 +26,67 @@ const AddProductPage: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFromChina, setIsFromChina] = useState(false);
+
+  // ✅ Variantes (tailles, couleurs, stock)
+  const [variants, setVariants] = useState<LocalVariant[]>([
+    { size: 'M', color: 'Bleu', stock: 0 },
+  ]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const urls = acceptedFiles.map(file => URL.createObjectURL(file));
-    setPreviewUrls(prev => [...prev, ...urls]);
-    setFiles(prev => [...prev, ...acceptedFiles]);
+    const urls = acceptedFiles.map((file) => URL.createObjectURL(file));
+    setPreviewUrls((prev) => [...prev, ...urls]);
+    setFiles((prev) => [...prev, ...acceptedFiles]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
-    maxFiles: 20, // accepte toutes les images d’un produit
-    maxSize: 20 * 1024 * 1024, // taille max 20MB par image
+    maxFiles: 20,
+    maxSize: 20 * 1024 * 1024,
   });
 
   const removeImage = (index: number) => {
-    setPreviewUrls(prev => {
+    setPreviewUrls((prev) => {
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const handleChinaToggle = () => {
+    setIsFromChina(!isFromChina);
+    setCategory(!isFromChina ? 'chine' : '');
+  };
+
+  // ✅ Gestion des variantes
+  const addVariant = () =>
+    setVariants([...variants, { size: 'M', color: 'Bleu', stock: 0 }]);
+
+  const updateVariant = (index: number, field: keyof LocalVariant, value: string | number) => {
+    const newVariants = [...variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setVariants(newVariants);
+  };
+
+  const removeVariant = (index: number) =>
+    variants.length > 1 && setVariants(variants.filter((_, i) => i !== index));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user || !user.id) {
-      alert("Vous devez être connecté pour publier un produit.");
+      alert('Vous devez être connecté pour publier un produit.');
       return;
     }
 
     if (!title.trim() || !description.trim() || !price || !stock || !category) {
-      alert("Tous les champs (nom, description, prix, stock, catégorie) sont obligatoires.");
+      alert('Tous les champs sont obligatoires.');
       return;
     }
 
     if (files.length < 2) {
-      alert("Veuillez ajouter au moins 2 images pour publier le produit.");
+      alert('Ajoutez au moins 2 images pour publier.');
       return;
     }
 
@@ -74,30 +101,41 @@ const AddProductPage: React.FC = () => {
           description,
           price: parseFloat(price),
           stock: parseInt(stock, 10),
-          category_id: category,
+          category,
           images_urls: imageUrls,
           seller_id: user.id,
           created_at: new Date().toISOString(),
           rating: 0,
           review_count: 0,
           featured: true,
+          is_from_china: isFromChina,
+          variants: variants, // ✅ Ajout des variantes dans Supabase
         },
       ]);
 
       if (error) {
         console.error('Erreur insertion produit :', error.message);
-        alert(`Erreur lors de la publication: ${error.message}`);
+        alert(`Erreur : ${error.message}`);
       } else {
-        alert('Produit publié avec succès !');
+        alert('✅ Produit publié avec succès !');
         navigate('/seller/dashboard');
       }
     } catch (err: any) {
       console.error('Erreur inconnue :', err.message || err);
-      alert("Une erreur est survenue.");
+      alert('Une erreur est survenue.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const categoriesList = [
+    { id: 'vetement', name: 'Vêtements 👕' },
+    { id: 'accessoire', name: 'Accessoires 💍' },
+    { id: 'meuble', name: 'Meubles 🪑' },
+    { id: 'enfant', name: 'Enfants 🧸' },
+    { id: 'chine', name: 'Produits de Chine 🇨🇳' },
+    { id: 'autre', name: 'Autres 🛍️' },
+  ];
 
   return (
     <Layout>
@@ -112,31 +150,34 @@ const AddProductPage: React.FC = () => {
             type="text"
             placeholder="Nom du produit"
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={(e) => setTitle(e.target.value)}
             className="w-full p-2 border rounded"
             required
           />
+
           <textarea
             placeholder="Description"
             value={description}
-            onChange={e => setDescription(e.target.value)}
+            onChange={(e) => setDescription(e.target.value)}
             className="w-full p-2 border rounded"
             required
           />
+
           <input
             type="number"
             placeholder="Prix"
             value={price}
-            onChange={e => setPrice(e.target.value)}
+            onChange={(e) => setPrice(e.target.value)}
             className="w-full p-2 border rounded"
             min={0}
             required
           />
+
           <input
             type="number"
-            placeholder="Stock"
+            placeholder="Stock total"
             value={stock}
-            onChange={e => setStock(e.target.value)}
+            onChange={(e) => setStock(e.target.value)}
             className="w-full p-2 border rounded"
             min={0}
             required
@@ -144,18 +185,69 @@ const AddProductPage: React.FC = () => {
 
           <select
             value={category}
-            onChange={e => setCategory(e.target.value)}
+            onChange={(e) => setCategory(e.target.value)}
             className="w-full p-2 border rounded"
             required
+            disabled={isFromChina}
           >
             <option value="">Sélectionnez une catégorie</option>
-            {categories.map(cat => (
+            {categoriesList.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
               </option>
             ))}
           </select>
 
+          {/* ✅ Gestion des variantes (tailles et couleurs) */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Variantes (taille, couleur, stock)</label>
+            <div className="space-y-3 mt-2">
+              {variants.map((variant, index) => (
+                <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Taille"
+                    value={variant.size}
+                    onChange={(e) => updateVariant(index, 'size', e.target.value)}
+                    className="p-2 border rounded"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Couleur"
+                    value={variant.color}
+                    onChange={(e) => updateVariant(index, 'color', e.target.value)}
+                    className="p-2 border rounded"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Stock"
+                    value={variant.stock}
+                    onChange={(e) => updateVariant(index, 'stock', parseInt(e.target.value))}
+                    className="p-2 border rounded"
+                  />
+                  {variants.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(index)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addVariant}
+                className="flex items-center text-blue-600 hover:underline"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Ajouter une variante
+              </button>
+            </div>
+          </div>
+
+          {/* Zone d’upload */}
           <div
             {...getRootProps()}
             className="border-2 border-dashed border-gray-400 p-4 rounded cursor-pointer text-center"
@@ -165,11 +257,13 @@ const AddProductPage: React.FC = () => {
               <p>Déposez les images ici...</p>
             ) : (
               <p className="flex items-center justify-center gap-2">
-                <Upload className="w-5 h-5" /> Glissez-déposez vos images ou cliquez pour sélectionner
+                <Upload className="w-5 h-5" />
+                Glissez-déposez ou cliquez pour sélectionner vos images
               </p>
             )}
           </div>
 
+          {/* Aperçu des images */}
           <div className="flex flex-wrap gap-4 mt-4">
             {previewUrls.map((url, index) => (
               <div key={index} className="relative">
@@ -183,6 +277,19 @@ const AddProductPage: React.FC = () => {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* Produit de Chine */}
+          <div className="mb-4">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={isFromChina}
+                onChange={handleChinaToggle}
+                className="form-checkbox"
+              />
+              <span>Ce produit vient de Chine 🇨🇳</span>
+            </label>
           </div>
 
           <button

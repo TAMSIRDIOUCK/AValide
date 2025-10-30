@@ -6,6 +6,7 @@ import Layout from '../../components/layout/Layout';
 import { useCart } from '../../context/CartContext';
 import { Heart, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabaseClient'; // Ajout de l'import manquant pour 'supabase'
 
 const SearchResultsPage = () => {
   const location = useLocation();
@@ -42,23 +43,34 @@ const SearchResultsPage = () => {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const allProducts = await getAllProductsFromSupabase();
-        const filtered = allProducts.filter(product =>
-          product.title.toLowerCase().includes(searchTerm) ||
-          product.description.toLowerCase().includes(searchTerm)
-        );
-        setResults(filtered);
-      } catch (error) {
-        console.error('Erreur lors du chargement des produits :', error);
-      } finally {
-        setLoading(false);
+    const fetchResults = async () => {
+      const { data: products, error: productError } = await supabase
+        .from('products')
+        .select('*');
+
+      const { data: services, error: serviceError } = await supabase
+        .from('services')
+        .select('*');
+
+      if (productError || serviceError) {
+        console.error('Erreur lors de la récupération des résultats:', productError || serviceError);
+        return;
       }
+
+      const filteredProducts = products.filter((product: any) =>
+        product.title.toLowerCase().includes(searchTerm) ||
+        product.description.toLowerCase().includes(searchTerm)
+      );
+
+      const filteredServices = services.filter((service: any) =>
+        service.title.toLowerCase().includes(searchTerm) ||
+        service.description.toLowerCase().includes(searchTerm)
+      );
+
+      setResults([...filteredProducts, ...filteredServices]);
     };
 
-    fetchProducts();
+    fetchResults();
   }, [searchTerm]);
 
   const addToCart = (product: Product) => {

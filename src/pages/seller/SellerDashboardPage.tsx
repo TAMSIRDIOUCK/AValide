@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/layout/Layout';
 import {
-  Package, Plus, Edit, Trash2, AlertCircle, MessageSquare,
+  Package, Plus, Edit, Trash2, AlertCircle, MessageSquare, Briefcase
 } from 'lucide-react';
 import { formatPrice } from '../../utils/formatters';
 import { deleteProduct } from '../../utils/productService';
@@ -32,7 +32,7 @@ const SellerDashboardPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('week');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false); // ✅ Ajout pour l'alerte
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -52,7 +52,6 @@ const SellerDashboardPage: React.FC = () => {
       console.error('❌ Erreur récupération produits :', productError.message);
       return;
     }
-
     setProducts(productsData || []);
 
     const items = await getOrderItemsBySeller(user.id);
@@ -60,7 +59,6 @@ const SellerDashboardPage: React.FC = () => {
     const now = new Date();
     const ordersMap = new Map<string, any[]>();
     let total = 0;
-    let count = 0;
     let todayCount = 0;
 
     items.forEach((item) => {
@@ -69,16 +67,13 @@ const SellerDashboardPage: React.FC = () => {
       if (isToday) todayCount++;
 
       if (isInPeriod(createdAt, selectedPeriod)) {
-        if (!ordersMap.has(item.order_id)) {
-          ordersMap.set(item.order_id, []);
-        }
+        if (!ordersMap.has(item.order_id)) ordersMap.set(item.order_id, []);
         ordersMap.get(item.order_id)?.push(item);
         total += (item.price || 0) * (item.quantity || 0);
       }
     });
 
-    count = ordersMap.size;
-    setOrderStats({ count, total });
+    setOrderStats({ count: ordersMap.size, total });
     setTodayOrdersCount(todayCount);
   };
 
@@ -110,11 +105,8 @@ const SellerDashboardPage: React.FC = () => {
   const confirmDelete = async () => {
     if (selectedProductId) {
       const { error } = await deleteProduct(selectedProductId);
-      if (error) {
-        console.error("❌ Erreur lors de la suppression :", error.message);
-      } else {
-        setProducts((prev) => prev.filter((p) => p.id !== selectedProductId));
-      }
+      if (error) console.error("❌ Erreur suppression :", error.message);
+      else setProducts((prev) => prev.filter((p) => p.id !== selectedProductId));
       setShowDeleteModal(false);
       setSelectedProductId(null);
     }
@@ -122,12 +114,14 @@ const SellerDashboardPage: React.FC = () => {
 
   const handleAddProductClick = () => {
     if (!user) return;
+    if (user.can_sell) navigate('/seller/products/add');
+    else setShowModal(true);
+  };
 
-    if (user.can_sell) {
-      navigate('/seller/products/add');
-    } else {
-      setShowModal(true);
-    }
+  const handleAddServiceClick = () => {
+    if (!user) return;
+    if (user.can_sell) navigate('/seller/services/add');
+    else setShowModal(true);
   };
 
   return (
@@ -150,7 +144,7 @@ const SellerDashboardPage: React.FC = () => {
           </div>
           <div className="flex gap-4 font-semibold">
             <span>Commandes : <span className="text-primary font-bold">{orderStats.count}</span></span>
-            <span>Total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)} </span></span>
+            <span>Total : <span className="text-green-600 font-bold">{formatPrice(orderStats.total)}</span></span>
           </div>
         </div>
 
@@ -160,7 +154,10 @@ const SellerDashboardPage: React.FC = () => {
             <Package /> Tableau de bord vendeur
           </h1>
           <div className="flex items-center gap-4">
-            <Link to="/orders" className="relative w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center shadow hover:bg-primary-dark transition">
+            <Link
+              to="/orders"
+              className="relative w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center shadow hover:bg-primary-dark transition"
+            >
               <MessageSquare size={20} />
               <span className={`absolute -top-1 -right-1 text-xs font-bold rounded-full px-1 ${
                 todayOrdersCount > 0 ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-700'
@@ -168,11 +165,21 @@ const SellerDashboardPage: React.FC = () => {
                 {todayOrdersCount}
               </span>
             </Link>
+
+            {/* ✅ Bouton Ajouter un produit */}
             <button
               onClick={handleAddProductClick}
               className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-full flex items-center gap-2 shadow-md transition"
             >
               <Plus size={20} /> Ajouter un produit
+            </button>
+
+            {/* ✅ Nouveau bouton Ajouter un service */}
+            <button
+              onClick={handleAddServiceClick}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-full flex items-center gap-2 shadow-md transition"
+            >
+              <Briefcase size={20} /> Ajouter un service
             </button>
           </div>
         </div>
@@ -182,7 +189,7 @@ const SellerDashboardPage: React.FC = () => {
           <div className="text-center bg-white p-8 rounded shadow">
             <Package size={48} className="mx-auto mb-4 text-primary" />
             <p className="text-lg font-semibold mb-2">Aucun produit</p>
-            <p className="text-gray-500 mb-4">Ajoutez un produit pour commencer à vendre.</p>
+            <p className="text-gray-500 mb-4">Ajoutez un produit ou un service pour commencer à vendre.</p>
             <button onClick={handleAddProductClick} className="btn-primary">Ajouter un produit</button>
           </div>
         ) : (
@@ -222,7 +229,7 @@ const SellerDashboardPage: React.FC = () => {
           </div>
         )}
 
-        {/* MODAL DE SUPPRESSION */}
+        {/* MODAL SUPPRESSION */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -245,7 +252,7 @@ const SellerDashboardPage: React.FC = () => {
           </div>
         )}
 
-        {/* MODAL DE RESTRICTION DE VENTE */}
+        {/* MODAL RESTRICTION VENTE */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
             <div className="bg-white p-6 rounded shadow-lg max-w-sm">
@@ -256,6 +263,7 @@ const SellerDashboardPage: React.FC = () => {
                 <a
                   href="https://wa.me/221704776258"
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="btn bg-green-600 text-white"
                 >
                   Contacter via WhatsApp

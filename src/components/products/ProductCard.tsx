@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShoppingCart } from 'lucide-react';
-import { Product } from '../../types';
+import { Product } from '../../types/types';
 import { useCart } from '../../context/CartContext';
 import { formatPrice } from '../../utils/formatters';
 

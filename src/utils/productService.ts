@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { Product } from '../types';
+import { Product } from '../types/types';
 
 // 🔹 Récupérer tous les produits
 export const getAllProductsFromSupabase = async (): Promise<Product[]> => {

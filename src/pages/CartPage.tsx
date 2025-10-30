@@ -1,34 +1,58 @@
+// src/pages/CartPage.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import CartItem from '../components/cart/CartItem';
 import ProductCard from '../components/products/ProductCard';
-import { useCart } from '../context/CartContext';
+import { useCart, CartItem as CartContextItem } from '../context/CartContext';
 import { formatPrice } from '../utils/formatters';
 import { ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react';
 
 const CartPage: React.FC = () => {
-  const { cartItems, clearCart } = useCart();
-  const total = cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  const { cartItems, clearCart, updateVariant } = useCart();
+
+  // ⚡ Calcul du total en prenant en compte la variante sélectionnée
+  const total = cartItems.reduce((acc: number, item: CartContextItem) => {
+    const price = item.selectedVariant?.price ?? item.product.price ?? 0;
+    return acc + price * item.quantity;
+  }, 0);
 
   const [likedProducts, setLikedProducts] = useState<any[]>([]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
 
-    // ✅ Récupère les produits likés depuis localStorage
+    // ✅ Récupération des produits likés depuis localStorage
     const storedLikes = localStorage.getItem('likedProducts');
     if (storedLikes) {
       try {
         const parsed = JSON.parse(storedLikes);
-        if (Array.isArray(parsed)) {
-          setLikedProducts(parsed);
-        }
+        if (Array.isArray(parsed)) setLikedProducts(parsed);
       } catch (error) {
         console.error('Erreur parsing produits likés :', error);
       }
     }
   }, []);
+
+  // ✅ Gestion du changement de variante depuis le panier
+  const handleVariantChange = (
+    productId: string,
+    size: string | undefined,
+    color: string | undefined
+  ) => {
+    const item = cartItems.find((i) => i.product.id === productId);
+    if (!item || !item.product.variants) return;
+
+    const newVariant = item.product.variants.find(
+      (v) =>
+        (size ? v.size === size : true) &&
+        (color ? v.color === color : true)
+    );
+
+    if (newVariant) {
+      updateVariant(productId, newVariant);
+    }
+  };
 
   return (
     <Layout>
@@ -54,6 +78,7 @@ const CartPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-6">
+            {/* Liste des articles */}
             <div className="w-full lg:w-2/3">
               <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 <div className="border-b pb-4 mb-4 flex justify-between items-center">
@@ -65,14 +90,19 @@ const CartPage: React.FC = () => {
                     Vider le panier
                   </button>
                 </div>
+
                 <div className="space-y-4">
-                  {cartItems.map((item) => (
-                    <CartItem item={item} key={item.product.id} />
+                  {cartItems.map((item: CartContextItem) => (
+                    <CartItem
+                      key={`${item.product.id}-${item.selectedVariant?.size}-${item.selectedVariant?.color}`}
+                      item={item}
+                    />
                   ))}
                 </div>
               </div>
             </div>
 
+            {/* Récapitulatif */}
             <div className="w-full lg:w-1/3">
               <div className="bg-white rounded-lg shadow p-4 sm:p-6 sticky top-20">
                 <h2 className="text-lg font-semibold border-b pb-4 mb-4">Récapitulatif</h2>
@@ -112,19 +142,19 @@ const CartPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
 
-      {/* ✅ Section produits aimés */}
-      {likedProducts.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
-          <h2 className="text-xl font-semibold mb-6 text-center mt-10">Produits que vous aimez</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {likedProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+        {/* Section produits aimés */}
+        {likedProducts.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
+            <h2 className="text-xl font-semibold mb-6 text-center mt-10">Produits que vous aimez</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {likedProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </Layout>
   );
 };
