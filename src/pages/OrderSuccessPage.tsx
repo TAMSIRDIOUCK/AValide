@@ -1,3 +1,4 @@
+// src/pages/OrderSuccessPage.tsx
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
@@ -10,6 +11,8 @@ interface OrderItem {
   title: string;
   price: number;
   quantity: number;
+  variant_size?: string;
+  variant_color?: string;
 }
 
 interface Order {
@@ -46,9 +49,7 @@ const OrderSuccessPage: React.FC = () => {
       setLoading(false);
     }
 
-    if (orderId) {
-      fetchOrder();
-    }
+    if (orderId) fetchOrder();
   }, [orderId]);
 
   const calculateTotal = () => {
@@ -106,6 +107,8 @@ const OrderSuccessPage: React.FC = () => {
               {order.order_items.map((item) => (
                 <li key={item.id}>
                   {item.title} – {item.quantity} × {item.price} FCFA
+                  {item.variant_size && <span> | Taille : {item.variant_size}</span>}
+                  {item.variant_color && <span> | Couleur : {item.variant_color}</span>}
                 </li>
               ))}
             </ul>

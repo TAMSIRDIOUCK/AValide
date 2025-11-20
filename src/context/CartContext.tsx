@@ -1,30 +1,32 @@
 // src/context/CartContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, ProductVariant } from '../types/types';
 
-// ✅ Type pour la variante dans le panier (adapté avec price)
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Product } from '../types/types';
+
+// ✅ Type pour la variante dans le panier
 export type Variant = {
-  id?: string;        // ID optionnel (peut venir de Supabase)
+  id?: string;
   size: string;
   color: string;
-  price?: number;     // Prix spécifique à la variante
-  stock?: number;     // Stock spécifique à la variante
+  price?: number;
+  stock?: number;
 };
 
-// ✅ Type pour un item dans le panier
+// ✅ Type pour un article du panier
 export type CartItem = {
   product: Product;
   quantity: number;
   sellerId: string;
-  selectedVariant?: Variant; // Variante sélectionnée
+  selectedVariant?: Variant;
+  cartItemId: string;
 };
 
 interface CartContextType {
   cartItems: CartItem[];
   addItem: (product: Product, quantity?: number, variant?: Variant) => void;
-  removeItem: (productId: string, variant?: Variant) => void;
-  updateQuantity: (productId: string, quantity: number, variant?: Variant) => void;
-  updateVariant: (productId: string, newVariant: Variant) => void;
+  removeItem: (cartItemId: string) => void;
+  updateQuantity: (cartItemId: string, quantity: number) => void;
+  updateVariant: (cartItemId: string, newVariant: Variant) => void;
   clearCart: () => void;
   itemCount: number;
   total: number;
@@ -40,28 +42,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const savedCart = localStorage.getItem('avalideCart');
       if (savedCart) {
-        const parsed: CartItem[] = JSON.parse(savedCart);
-        setCartItems(parsed);
+        setCartItems(JSON.parse(savedCart));
       }
     } catch (error) {
-      console.error('Erreur de parsing du panier depuis localStorage:', error);
+      console.error('Erreur lors du chargement du panier depuis localStorage :', error);
       setCartItems([]);
     }
   }, []);
 
-  // 🔹 Sauvegarder le panier dans localStorage
+  // 🔹 Sauvegarder automatiquement dans localStorage
   useEffect(() => {
     localStorage.setItem('avalideCart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // ✅ Ajouter un produit (avec ou sans variante)
+  // ✅ Ajouter un produit au panier
   const addItem = (product: Product, quantity = 1, variant?: Variant) => {
+    if (!product) return;
     const sellerId = product.sellerId;
-    if (!product || !sellerId) return;
 
-    setCartItems(currentItems => {
+    setCartItems((currentItems) => {
       const existingItem = currentItems.find(
-        item =>
+        (item) =>
           item.product.id === product.id &&
           (variant
             ? item.selectedVariant?.size === variant.size &&
@@ -72,59 +73,51 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const maxStock = variant?.stock ?? product.stock ?? Infinity;
 
       if (existingItem) {
-        const newQuantity = existingItem.quantity + quantity;
-        if (newQuantity > maxStock) {
+        const newQty = existingItem.quantity + quantity;
+        if (newQty > maxStock) {
           alert(`Stock limité. Seulement ${maxStock} en stock.`);
           return currentItems;
         }
-        return currentItems.map(item =>
-          item === existingItem ? { ...item, quantity: newQuantity } : item
+        return currentItems.map((item) =>
+          item === existingItem ? { ...item, quantity: newQty } : item
         );
       } else {
         if (quantity > maxStock) {
           alert(`Stock limité. Seulement ${maxStock} en stock.`);
           return currentItems;
         }
-        return [...currentItems, { product, quantity, sellerId, selectedVariant: variant }];
+
+        return [
+          ...currentItems,
+          {
+            product,
+            quantity,
+            sellerId,
+            selectedVariant: variant || undefined,
+            cartItemId: `${product.id}-${variant?.size ?? ''}-${variant?.color ?? ''}-${Date.now()}`,
+          },
+        ];
       }
     });
   };
 
-  // ✅ Supprimer un produit ou une variante spécifique
-  const removeItem = (productId: string, variant?: Variant) => {
-    setCartItems(currentItems =>
-      currentItems.filter(
-        item =>
-          !(
-            item.product.id === productId &&
-            (variant
-              ? item.selectedVariant?.size === variant.size &&
-                item.selectedVariant?.color === variant.color
-              : true)
-          )
-      )
+  // ✅ Supprimer un produit du panier
+  const removeItem = (cartItemId: string) => {
+    setCartItems((currentItems) =>
+      currentItems.filter((item) => item.cartItemId !== cartItemId)
     );
   };
 
-  // ✅ Mettre à jour la quantité
-  const updateQuantity = (productId: string, quantity: number, variant?: Variant) => {
-    setCartItems(currentItems =>
-      currentItems.map(item => {
-        const isSameProduct = item.product.id === productId;
-        const isSameVariant =
-          variant
-            ? item.selectedVariant?.size === variant.size &&
-              item.selectedVariant?.color === variant.color
-            : true;
-
-        if (isSameProduct && isSameVariant) {
-          const maxStock = variant?.stock ?? item.selectedVariant?.stock ?? item.product.stock ?? Infinity;
-
+  // ✅ Mettre à jour la quantité d’un produit
+  const updateQuantity = (cartItemId: string, quantity: number) => {
+    setCartItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.cartItemId === cartItemId) {
+          const maxStock = item.selectedVariant?.stock ?? item.product.stock ?? Infinity;
           if (quantity > maxStock) {
             alert(`Stock insuffisant. Seulement ${maxStock} en stock.`);
             return item;
           }
-
           if (quantity <= 0) return item;
           return { ...item, quantity };
         }
@@ -133,24 +126,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  // ✅ Changer la variante d’un produit
-  const updateVariant = (productId: string, newVariant: Variant) => {
-    setCartItems(currentItems =>
-      currentItems.map(item =>
-        item.product.id === productId
+  // ✅ Mettre à jour la variante (taille, couleur)
+  const updateVariant = (cartItemId: string, newVariant: Variant) => {
+    setCartItems((currentItems) =>
+      currentItems.map((item) =>
+        item.cartItemId === cartItemId
           ? { ...item, selectedVariant: newVariant, quantity: 1 }
           : item
       )
     );
   };
 
-  const clearCart = () => setCartItems([]);
+  // ✅ Vider tout le panier
+  const clearCart = () => {
+    setCartItems([]);
+    localStorage.removeItem('avalideCart');
+  };
 
-  const itemCount = cartItems.reduce((count, item) => count + item.quantity, 0);
+  // 🔹 Calcul du nombre total d’articles
+  const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // ✅ Total en prenant en compte la variante si elle a un prix
+  // 🔹 Calcul du total global
   const total = cartItems.reduce(
-    (sum, item) => sum + (item.selectedVariant?.price ?? item.product.price) * item.quantity,
+    (sum, item) =>
+      sum + (item.selectedVariant?.price ?? item.product.price) * item.quantity,
     0
   );
 
@@ -172,7 +171,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// ✅ Hook pour utiliser le panier
+// ✅ Hook personnalisé pour accéder facilement au panier
 export const useCart = (): CartContextType => {
   const context = useContext(CartContext);
   if (!context) throw new Error('useCart must be used within a CartProvider');

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Star } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
-import { Product } from '../../types/types';
+import { Product, ProductVariant } from '../../types/types';
 import { formatPrice } from '../../utils/formatters';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
@@ -56,6 +56,21 @@ const FeaturedProducts: React.FC = () => {
           stock: p.stock || 0,
           likes: p.likes || 0,
           isFromChina: Boolean(p.is_from_china),
+          // ✅ Parsing sécurisé des variants
+          variants: (() => {
+            try {
+              if (typeof p.variants === 'string') {
+                return JSON.parse(p.variants) as ProductVariant[];
+              } else if (Array.isArray(p.variants)) {
+                return p.variants as ProductVariant[];
+              } else {
+                return [];
+              }
+            } catch (err) {
+              console.error('Erreur parsing variants:', err);
+              return [];
+            }
+          })(),
         }));
 
         setProducts(adapted);
@@ -94,7 +109,7 @@ const FeaturedProducts: React.FC = () => {
       : products.filter((p) => p.category === selectedCategory);
 
   return (
-    <section className="py-16 bg-gray-50">
+    <section id="featured-products" className="py-16 bg-gray-50">
       <div className="container-custom px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Produits en Vedette</h2>

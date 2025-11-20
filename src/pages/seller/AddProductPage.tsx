@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Package, Upload, X, Plus, Trash2 } from 'lucide-react';
+import { Package, Upload, X } from 'lucide-react';
 
 import Layout from '../../components/layout/Layout';
 import { supabase } from '../../lib/supabaseClient';
@@ -11,7 +11,6 @@ import { uploadProductImages } from '../../lib/productImage';
 interface LocalVariant {
   size: string;
   color: string;
-  stock: number;
 }
 
 const AddProductPage: React.FC = () => {
@@ -21,17 +20,15 @@ const AddProductPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [stock, setStock] = useState('');
+  const [stock, setStock] = useState(0);
   const [category, setCategory] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFromChina, setIsFromChina] = useState(false);
 
-  // ✅ Variantes (tailles, couleurs, stock)
-  const [variants, setVariants] = useState<LocalVariant[]>([
-    { size: 'M', color: 'Bleu', stock: 0 },
-  ]);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const urls = acceptedFiles.map((file) => URL.createObjectURL(file));
@@ -59,18 +56,26 @@ const AddProductPage: React.FC = () => {
     setCategory(!isFromChina ? 'chine' : '');
   };
 
-  // ✅ Gestion des variantes
-  const addVariant = () =>
-    setVariants([...variants, { size: 'M', color: 'Bleu', stock: 0 }]);
+  const sizesList = ['M', 'L', 'XL', 'XXL', '36', '37', '38', '39', '40', '41'];
+  const colorsList = [
+    { name: 'Rouge', color: '#FF0000' },
+    { name: 'Bleu', color: '#0000FF' },
+    { name: 'Vert', color: '#008000' },
+    { name: 'Noir', color: '#000000' },
+    { name: 'Blanc', color: '#FFFFFF' },
+  ];
 
-  const updateVariant = (index: number, field: keyof LocalVariant, value: string | number) => {
-    const newVariants = [...variants];
-    newVariants[index] = { ...newVariants[index], [field]: value };
-    setVariants(newVariants);
+  const toggleSize = (size: string) => {
+    setSelectedSizes((prev) =>
+      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
+    );
   };
 
-  const removeVariant = (index: number) =>
-    variants.length > 1 && setVariants(variants.filter((_, i) => i !== index));
+  const toggleColor = (color: string) => {
+    setSelectedColors((prev) =>
+      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +85,7 @@ const AddProductPage: React.FC = () => {
       return;
     }
 
-    if (!title.trim() || !description.trim() || !price || !stock || !category) {
+    if (!title.trim() || !description.trim() || !price || !category) {
       alert('Tous les champs sont obligatoires.');
       return;
     }
@@ -95,12 +100,28 @@ const AddProductPage: React.FC = () => {
     try {
       const imageUrls = await uploadProductImages(files);
 
+      // Génération automatique des variantes combinant tailles et couleurs
+      let variants: LocalVariant[] = [];
+      if (selectedSizes.length && selectedColors.length) {
+        selectedSizes.forEach((size) => {
+          selectedColors.forEach((color) => {
+            variants.push({ size, color });
+          });
+        });
+      } else if (selectedSizes.length) {
+        variants = selectedSizes.map((size) => ({ size, color: '' }));
+      } else if (selectedColors.length) {
+        variants = selectedColors.map((color) => ({ size: '', color }));
+      } else {
+        variants = [{ size: '', color: '' }]; // Pas de taille ni couleur
+      }
+
       const { error } = await supabase.from('products').insert([
         {
           title,
           description,
           price: parseFloat(price),
-          stock: parseInt(stock, 10),
+          stock,
           category,
           images_urls: imageUrls,
           seller_id: user.id,
@@ -109,7 +130,7 @@ const AddProductPage: React.FC = () => {
           review_count: 0,
           featured: true,
           is_from_china: isFromChina,
-          variants: variants, // ✅ Ajout des variantes dans Supabase
+          variants,
         },
       ]);
 
@@ -175,9 +196,9 @@ const AddProductPage: React.FC = () => {
 
           <input
             type="number"
-            placeholder="Stock total"
+            placeholder="Stock global"
             value={stock}
-            onChange={(e) => setStock(e.target.value)}
+            onChange={(e) => setStock(parseInt(e.target.value))}
             className="w-full p-2 border rounded"
             min={0}
             required
@@ -198,52 +219,46 @@ const AddProductPage: React.FC = () => {
             ))}
           </select>
 
-          {/* ✅ Gestion des variantes (tailles et couleurs) */}
+          {/* ✅ Tailles */}
           <div>
-            <label className="text-sm font-medium text-gray-700">Variantes (taille, couleur, stock)</label>
-            <div className="space-y-3 mt-2">
-              {variants.map((variant, index) => (
-                <div key={index} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <label className="text-sm font-medium text-gray-700">Tailles disponibles</label>
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {sizesList.map((size) => (
+                <label key={size} className="flex items-center space-x-2">
                   <input
-                    type="text"
-                    placeholder="Taille"
-                    value={variant.size}
-                    onChange={(e) => updateVariant(index, 'size', e.target.value)}
-                    className="p-2 border rounded"
+                    type="checkbox"
+                    checked={selectedSizes.includes(size)}
+                    onChange={() => toggleSize(size)}
+                    className="form-checkbox"
                   />
-                  <input
-                    type="text"
-                    placeholder="Couleur"
-                    value={variant.color}
-                    onChange={(e) => updateVariant(index, 'color', e.target.value)}
-                    className="p-2 border rounded"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Stock"
-                    value={variant.stock}
-                    onChange={(e) => updateVariant(index, 'stock', parseInt(e.target.value))}
-                    className="p-2 border rounded"
-                  />
-                  {variants.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeVariant(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
+                  <span>{size}</span>
+                </label>
               ))}
-              <button
-                type="button"
-                onClick={addVariant}
-                className="flex items-center text-blue-600 hover:underline"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Ajouter une variante
-              </button>
+            </div>
+          </div>
+
+          {/* ✅ Couleurs */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Couleurs disponibles</label>
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {colorsList.map((c) => (
+                <label key={c.name} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedColors.includes(c.name)}
+                    onChange={() => toggleColor(c.name)}
+                    className="form-checkbox"
+                    style={{ accentColor: c.color }}
+                  />
+                  <span className="flex items-center space-x-1">
+                    <span
+                      className="w-4 h-4 rounded-full border"
+                      style={{ backgroundColor: c.color }}
+                    ></span>
+                    <span>{c.name}</span>
+                  </span>
+                </label>
+              ))}
             </div>
           </div>
 

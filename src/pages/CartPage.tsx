@@ -9,7 +9,7 @@ import { formatPrice } from '../utils/formatters';
 import { ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react';
 
 const CartPage: React.FC = () => {
-  const { cartItems, clearCart, updateVariant } = useCart();
+  const { cartItems, clearCart } = useCart();
 
   // ⚡ Calcul du total en prenant en compte la variante sélectionnée
   const total = cartItems.reduce((acc: number, item: CartContextItem) => {
@@ -34,25 +34,11 @@ const CartPage: React.FC = () => {
     }
   }, []);
 
-  // ✅ Gestion du changement de variante depuis le panier
-  const handleVariantChange = (
-    productId: string,
-    size: string | undefined,
-    color: string | undefined
-  ) => {
-    const item = cartItems.find((i) => i.product.id === productId);
-    if (!item || !item.product.variants) return;
-
-    const newVariant = item.product.variants.find(
-      (v) =>
-        (size ? v.size === size : true) &&
-        (color ? v.color === color : true)
-    );
-
-    if (newVariant) {
-      updateVariant(productId, newVariant);
-    }
-  };
+  // Ensure each cart item has a unique cartItemId
+  const cartItemsWithIds = cartItems.map((item, index) => ({
+    ...item,
+    cartItemId: `${item.product.id}-${index}`,
+  }));
 
   return (
     <Layout>
@@ -92,11 +78,8 @@ const CartPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {cartItems.map((item: CartContextItem) => (
-                    <CartItem
-                      key={`${item.product.id}-${item.selectedVariant?.size}-${item.selectedVariant?.color}`}
-                      item={item}
-                    />
+                  {cartItemsWithIds.map((item) => (
+                    <CartItem key={item.cartItemId} item={item} />
                   ))}
                 </div>
               </div>
@@ -114,7 +97,7 @@ const CartPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Frais de livraison</span>
-                    <span>Calculé à l’étape suivante</span>
+                    <span>A payer une fois le produit livré</span>
                   </div>
                 </div>
 

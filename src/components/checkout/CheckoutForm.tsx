@@ -2,53 +2,55 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
 import { formatPrice } from '../../utils/formatters';
-import { Truck } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../../lib/supabaseClient';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Zap } from 'lucide-react';
 import OrderConfirmation from '../../components/OrderConfirmation';
 
 const CheckoutForm: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, total, clearCart } = useCart();
-  const { user } = useAuth();
 
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [additionalInfo, setAdditionalInfo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
-  if (cartItems.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-lg mb-4">Votre panier est vide</p>
-        <button onClick={() => navigate('/products')} className="btn-primary">
-          Parcourir les produits
-        </button>
-      </div>
-    );
-  }
+  // ⚠️ Avalide Pay non disponible
+  const handleAvalidePay = () => {
+    setAlertMessage('⚠️ Avalide Pay n’est pas encore disponible. Veuillez utiliser Wave.');
+    setPaymentMethod('avalide');
+    setTimeout(() => setAlertMessage(null), 3000);
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ✅ Passer la commande avec Wave
+  const handleWavePayment = async () => {
+    if (!name || !phone || !address) {
+      setAlertMessage('❌ Veuillez remplir votre nom, téléphone et adresse.');
+      setTimeout(() => setAlertMessage(null), 3000);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const orderId = uuidv4();
       const orderDate = new Date().toISOString();
 
-      // ✅ 1. Enregistrement dans orders
+      // 1️⃣ Insertion de la commande principale
       const { error: orderError } = await supabase.from('orders').insert([
         {
           id: orderId,
-          user_id: user?.id || null,
+          user_id: null,
           total,
-          payment_method: 'cash_on_delivery',
+          payment_method: 'wave',
           customer_name: name,
           customer_phone: phone,
           customer_address: address,
@@ -58,48 +60,47 @@ const CheckoutForm: React.FC = () => {
           status: 'en_attente',
         },
       ]);
+      if (orderError) throw new Error(orderError.message);
 
-      if (orderError) throw new Error(`Erreur insertion commande : ${orderError.message}`);
-
-      // ✅ 2. Enregistrement des articles
-      const orderItems = cartItems.map((item) => {
-        const imageUrl = Array.isArray(item.product.images) && item.product.images.length > 0
-          ? item.product.images[0]
-          : null;
-
-        return {
-          id: uuidv4(),
-          order_id: orderId,
-          product_id: item.product.id,
-          quantity: item.quantity,
-          price: item.product.price,
-          seller_id: item.product.sellerId,
-          image_url: imageUrl,
-          created_at: orderDate,
-          title: item.product.title,
-          customer_name: name,
-          customer_phone: phone,
-          customer_address: address,
-          status: 'en_attente',
-        };
-      });
+      // 2️⃣ Insertion des articles avec variantes
+      const orderItems = cartItems.map((item) => ({
+        id: uuidv4(),
+        order_id: orderId,
+        product_id: item.product.id,
+        quantity: item.quantity,
+        price: item.selectedVariant?.price ?? item.product.price,
+        seller_id: item.product.sellerId,
+        image_url:
+          Array.isArray(item.product.images) && item.product.images.length > 0
+            ? item.product.images[0]
+            : null,
+        created_at: orderDate,
+        title: item.product.title,
+        customer_name: name,
+        customer_phone: phone,
+        customer_address: address,
+        status: 'en_attente',
+        variant_size: item.selectedVariant?.size || null,
+        variant_color: item.selectedVariant?.color || null,
+      }));
 
       const { error: itemError } = await supabase.from('order_items').insert(orderItems);
-      if (itemError) throw new Error(`Erreur insertion articles : ${itemError.message}`);
+      if (itemError) throw new Error(itemError.message);
 
-      // ✅ 3. Marqueur de commande réussie pour l'affichage du message dans le header
+      // 3️⃣ Confirmation locale
+      localStorage.setItem('lastOrderId', orderId);
       localStorage.setItem('lastOrderTime', Date.now().toString());
-
-      // ✅ Confirmation
       setShowConfirmation(true);
+      clearCart();
+
+      // 4️⃣ Redirection vers Wave
       setTimeout(() => {
-        setShowConfirmation(false);
-        clearCart();
-        navigate('/mes-commandes');
-      }, 3000);
+        window.location.href = 'https://pay.wave.com/m/M_sn__ztPYhnBp3l5/c/sn/';
+      }, 1500);
     } catch (error: any) {
       console.error('💥 Erreur pendant la commande :', error);
-      alert(error.message || 'Une erreur est survenue.');
+      setAlertMessage(`❌ ${error.message || 'Une erreur est survenue.'}`);
+      setTimeout(() => setAlertMessage(null), 4000);
     } finally {
       setIsSubmitting(false);
     }
@@ -107,10 +108,25 @@ const CheckoutForm: React.FC = () => {
 
   return (
     <>
+      {/* 🔹 Alert */}
+      <AnimatePresence>
+        {alertMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-md shadow-lg z-50"
+          >
+            {alertMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔹 Confirmation */}
       <AnimatePresence>{showConfirmation && <OrderConfirmation />}</AnimatePresence>
 
       {!showConfirmation && (
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form className="space-y-8">
           <div className="grid grid-cols-2 md:grid-cols-2 gap-8">
             {/* Infos client */}
             <div>
@@ -122,8 +138,7 @@ const CheckoutForm: React.FC = () => {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="input"
-                    required
+                    className="input border border-gray-300 rounded-md p-2 w-full"
                   />
                 </div>
                 <div>
@@ -132,7 +147,7 @@ const CheckoutForm: React.FC = () => {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="input"
+                    className="input border border-gray-300 rounded-md p-2 w-full"
                   />
                 </div>
                 <div>
@@ -141,17 +156,15 @@ const CheckoutForm: React.FC = () => {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="input"
-                    required
+                    className="input border border-gray-300 rounded-md p-2 w-full"
                   />
                 </div>
                 <div>
-                  <label className="label">Adresse de livraison</label>
+                  <label className="label">Adresse</label>
                   <textarea
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="input min-h-[80px]"
-                    required
+                    className="input border border-gray-300 rounded-md p-2 w-full min-h-[80px]"
                   />
                 </div>
                 <div>
@@ -159,49 +172,73 @@ const CheckoutForm: React.FC = () => {
                   <textarea
                     value={additionalInfo}
                     onChange={(e) => setAdditionalInfo(e.target.value)}
-                    className="input min-h-[80px]"
+                    className="input border border-gray-300 rounded-md p-2 w-full min-h-[80px]"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Paiement et résumé */}
+            {/* Paiement */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Paiement</h3>
-              <div className="border rounded-md p-4 bg-primary-light/10 border-primary">
-                <div className="flex items-center">
-                  <div className="h-5 w-5 rounded-full border border-primary">
-                    <div className="h-3 w-3 rounded-full bg-primary m-0.5" />
-                  </div>
-                  <div className="ml-3 flex items-center">
-                    <Truck className="h-5 w-5 text-primary mr-2" />
-                    <span className="font-medium">Paiement à la livraison</span>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-500 mt-2 ml-8">
-                  Payez en espèces à la réception de votre commande.
-                </p>
-              </div>
+              <h3 className="text-lg font-semibold mb-4">Méthode de paiement</h3>
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={handleAvalidePay}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-md bg-gray-400 hover:bg-gray-500 text-white font-semibold transition"
+                >
+                  <Zap size={20} />
+                  Avalide Pay (bientôt disponible)
+                </button>
 
-              <div className="mt-8 space-y-4">
-                <h3 className="text-lg font-semibold mb-2">Résumé de la commande</h3>
-                {cartItems.map((item) => (
-                  <div key={item.product.id} className="flex justify-between text-sm">
-                    <span>{item.quantity} × {item.product.title}</span>
-                    <span>{formatPrice(item.product.price * item.quantity)}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between font-semibold border-t pt-2">
-                  <span>Total</span>
-                  <span>{formatPrice(total)}</span>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <button type="submit" className="btn-primary w-full" disabled={isSubmitting}>
-                  {isSubmitting ? 'Validation en cours...' : 'Passer la commande'}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('wave')}
+                  className={`flex items-center justify-center gap-7 w-full px-5 py-6 rounded-md bg-blue-700 hover:bg-blue-700 text-white font-semibold transition ${
+                    paymentMethod === 'wave' ? 'ring-2 ring-offset-2 ring-blue-400' : ''
+                  }`}
+                >
+                  <img src="/videos/wave.png" alt="Wave" className="w-10 h-6" />
+                  Wave
                 </button>
               </div>
+
+              {paymentMethod === 'wave' && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-2">Résumé de la commande</h3>
+                  <div className="space-y-2">
+                    {cartItems.map((item) => (
+                      <div key={item.cartItemId} className="flex justify-between text-sm">
+                        <span>
+                          {item.quantity} × {item.product.title}
+                          {item.selectedVariant?.size && ` (Taille: ${item.selectedVariant.size})`}
+                          {item.selectedVariant?.color && ` (Couleur: ${item.selectedVariant.color})`}
+                        </span>
+                        <span>
+                          {formatPrice(
+                            (item.selectedVariant?.price ?? item.product.price) * item.quantity
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between font-semibold border-t pt-2">
+                      <span>Total</span>
+                      <span>{formatPrice(total)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={handleWavePayment}
+                      className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-md transition flex items-center justify-center gap-2"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Validation en cours...' : 'Passer la commande'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </form>

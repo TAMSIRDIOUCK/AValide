@@ -7,32 +7,35 @@ const Hero: React.FC = () => {
     {
       id: 1,
       src: "/videos/ScreenRecording_10-30-2025 14-11-37_1.mov",
-      poster: "/videos/insMind-2.JPG",
+      poster: "/videos/public/videos/insMind-2.JPG",
     },
     {
       id: 2,
-      src: "/videos/ScreenRecording_07-25-2025 01-47-46_1.mov",
-      poster: "/videos/IMG_1706.jpg",
+      src: "/videos/ÉCLAT NATURE Lait et Savon_Mises en avant de produits_Pippit_202511201839.mov",
+      poster: "/videos/IMG_4068 2.JPG",
     },
     {
       id: 3,
-      src: "/videos/ScreenRecording_07-25-2025 02-07-18_1.mov",
-      poster: "/videos/IMG_1712.jpg",
+      src: "/videos/ScreenRecording_07-25-2025 01-47-46_1.mov",
+      poster: "/videos/IMG_1706.jpg",
     },
     {
       id: 4,
       src: "/videos/ScreenRecording_07-25-2025 02-11-38_1.mov",
       poster: "/videos/IMG_1721.jpg",
     },
-    
-    
   ];
 
   const featuredImages = [
+   
     "/videos/InsMindAIModel.JPG",
     "/videos/insMind-2.JPG",
     "/videos/IMG_1226.JPEG",
     "/videos/IMG_1225.JPEG",
+    "/videos/IMG_4065.jpg",
+    "/videos/IMG_4067 2.jpg",
+    "/videos/IMG_4068 2.JPG",
+    "/videos/IMG_4066 2.jpg",
     "/videos/IMG_1706.jpg",
     "/videos/IMG_1707.jpg",
     "/videos/IMG_1708.jpg",
@@ -45,9 +48,6 @@ const Hero: React.FC = () => {
     "/videos/IMG_1718.jpg",
     "/videos/IMG_1719.jpg",
     "/videos/IMG_1720.jpg",
-   
-
-    // Tu peux en ajouter autant que tu veux ici
   ];
 
   const videoRefs = useRef<HTMLVideoElement[]>([]);
@@ -73,6 +73,7 @@ const Hero: React.FC = () => {
     });
   };
 
+  // Gestion automatique de la lecture des vidéos selon visibilité
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -142,13 +143,15 @@ const Hero: React.FC = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4">
+          {/* 🔗 Le bouton Acheter défile vers la section produits en vedette */}
           <a
-            href="#categories"
+            href="#featured-products"
             onClick={saveScrollPosition}
             className="px-6 py-3 bg-green-600 text-white font-semibold rounded-2xl shadow hover:bg-green-700 transition"
           >
             Acheter
           </a>
+
           <Link
             to="/seller/dashboard"
             onClick={saveScrollPosition}
@@ -159,7 +162,7 @@ const Hero: React.FC = () => {
         </div>
       </div>
 
-      {/* Produits en vedette - défilement automatique & manuel */}
+      {/* Produits en vedette - défilement horizontal automatique */}
       <div className="bg-white pt-4 pb-0 -mb-4">
         <h2 className="text-xl md:text-2xl font-semibold text-center text-gray-800 mb-4">
           Produits en vedette

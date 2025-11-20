@@ -1,9 +1,10 @@
 // src/components/cart/CartItem.tsx
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Trash, Plus, Minus } from 'lucide-react';
-import { useCart, CartItem as CartContextItem } from '../../context/CartContext';
-import { ProductVariant } from '../../types/types'; // ✅ Import depuis types.ts
+import { useCart, CartItem as CartContextItem, Variant } from '../../context/CartContext';
+import { ProductVariant } from '../../types/types';
 import { formatPrice } from '../../utils/formatters';
 
 interface CartItemProps {
@@ -12,102 +13,150 @@ interface CartItemProps {
 
 const CartItem: React.FC<CartItemProps> = ({ item }) => {
   const { updateQuantity, removeItem, updateVariant } = useCart();
-  const { product, quantity, selectedVariant } = item;
+  const { product, quantity, selectedVariant, cartItemId } = item;
 
-  const maxStock = selectedVariant?.stock ?? product.stock ?? Infinity;
+  if (!product) return null;
 
-  const handleIncrement = () => {
-    if (quantity < maxStock) {
-      updateQuantity(product.id, quantity + 1, selectedVariant);
+  // 🔹 Récupération des variantes
+  let variants: ProductVariant[] = [];
+  try {
+    if (typeof product.variants === 'string') {
+      variants = JSON.parse(product.variants);
+    } else if (Array.isArray(product.variants)) {
+      variants = product.variants;
     }
+  } catch (error) {
+    console.error('Erreur parsing variantes :', error);
+  }
+
+  const availableSizes = [...new Set(variants.map((v) => v.size).filter(Boolean))];
+  const availableColors = [...new Set(variants.map((v) => v.color).filter(Boolean))];
+
+  const currentVariant: Variant = selectedVariant || {
+    size: '',
+    color: '',
+    price: product.price,
+    stock: product.stock ?? Infinity,
+  };
+
+  const [localVariant, setLocalVariant] = useState<Variant>(currentVariant);
+  const [localQuantity, setLocalQuantity] = useState<number>(quantity || 1);
+
+  const price = localVariant.price ?? product.price ?? 0;
+  const maxStock = localVariant.stock ?? product.stock ?? Infinity;
+
+  // 🔹 Synchroniser la quantité avec le contexte
+  useEffect(() => {
+    updateQuantity(cartItemId, localQuantity);
+  }, [localQuantity]);
+
+  // 🔹 Gestion des variantes
+  const handleSizeSelect = (size: string) => {
+    const newVariant: Variant =
+      variants.find((v) => v.size === size && v.color === localVariant.color) ||
+      { ...localVariant, size };
+    setLocalVariant(newVariant);
+    updateVariant(cartItemId, newVariant);
+  };
+
+  const handleColorSelect = (color: string) => {
+    const newVariant: Variant =
+      variants.find((v) => v.color === color && v.size === localVariant.size) ||
+      { ...localVariant, color };
+    setLocalVariant(newVariant);
+    updateVariant(cartItemId, newVariant);
+  };
+
+  // 🔹 Gestion de la quantité
+  const handleIncrement = () => {
+    if (localQuantity < maxStock) setLocalQuantity(localQuantity + 1);
   };
 
   const handleDecrement = () => {
-    if (quantity > 1) {
-      updateQuantity(product.id, quantity - 1, selectedVariant);
-    } else {
-      removeItem(product.id, selectedVariant);
-    }
+    if (localQuantity > 1) setLocalQuantity(localQuantity - 1);
   };
 
-  const handleRemove = () => {
-    removeItem(product.id, selectedVariant);
+  const handleQuantityChange = (val: string) => {
+    const parsed = parseInt(val);
+    if (isNaN(parsed) || parsed < 1) return setLocalQuantity(1);
+    if (parsed > maxStock) return setLocalQuantity(maxStock);
+    setLocalQuantity(parsed);
   };
 
-  // ✅ Récupération des tailles et couleurs depuis les variantes
-  const availableSizes = product.variants?.map((v: ProductVariant) => v.size) ?? [];
-  const availableColors = product.variants?.map((v: ProductVariant) => v.color) ?? [];
-
-  const price = selectedVariant?.price ?? product.price;
+  
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-b border-gray-200">
-      {/* IMAGE + DÉTAILS PRODUIT */}
+      {/* IMAGE + DÉTAILS */}
       <div className="flex items-center gap-4 w-full sm:w-2/5">
         <div className="w-24 h-24 bg-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-          <img src={product.images[0]} alt={product.description} className="w-full h-full object-cover" />
+          <img
+            src={product.images?.[0] || '/placeholder.png'}
+            alt={product.title || 'Produit'}
+            className="w-full h-full object-cover"
+          />
         </div>
+
         <div className="flex flex-col gap-1 overflow-hidden">
           <span className="font-bold text-sm text-gray-800 line-clamp-1">{product.title}</span>
-
           <Link
             to={`/products/${product.id}`}
-            className="text-base font-medium text-gray-700 hover:text-primary line-clamp-1"
+            className="text-sm text-gray-600 hover:text-primary line-clamp-1"
           >
             {product.description}
           </Link>
-
           <span className="text-primary font-semibold text-sm">{formatPrice(price)}</span>
 
-          {product.variants && product.variants.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <div>
-                <label className="block text-sm font-medium mb-2">Taille</label>
-                <select
-                  value={selectedVariant?.size || ''}
-                  onChange={(e) => {
-                    const newSize = e.target.value;
-                    const newVariant = product.variants?.find(
-                      (v) => v.size === newSize && v.color === selectedVariant?.color
-                    );
-                    if (newVariant) updateVariant(product.id, newVariant);
-                  }}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  {availableSizes.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {/* Variantes */}
+          {variants.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              {availableSizes.length > 0 && (
+                <div>
+                  <span className="block text-sm font-medium mb-1">Taille</span>
+                  <div className="flex flex-wrap gap-2">
+                    {availableSizes.map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => handleSizeSelect(size)}
+                        className={`px-3 py-1 rounded-lg border text-sm transition ${
+                          localVariant.size === size
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Couleur</label>
-                <select
-                  value={selectedVariant?.color || ''}
-                  onChange={(e) => {
-                    const newColor = e.target.value;
-                    const newVariant = product.variants?.find(
-                      (v) => v.color === newColor && v.size === selectedVariant?.size
-                    );
-                    if (newVariant) updateVariant(product.id, newVariant);
-                  }}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  {availableColors.map((color) => (
-                    <option key={color} value={color}>
-                      {color}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {availableColors.length > 0 && (
+                <div>
+                  <span className="block text-sm font-medium mb-1">Couleur</span>
+                  <div className="flex flex-wrap gap-2">
+                    {availableColors.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => handleColorSelect(color)}
+                        className={`px-3 py-1 rounded-lg border text-sm transition ${
+                          localVariant.color === color
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {color}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* QUANTITÉ + TOTAL + SUPPRIMER */}
+      {/* Quantité + Total + Supprimer */}
       <div className="flex flex-col sm:flex-row items-center justify-between w-full sm:w-3/5 gap-4">
         <div className="flex items-center">
           <button
@@ -120,21 +169,16 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
 
           <input
             type="text"
-            value={quantity}
-            onChange={(e) => {
-              const val = parseInt(e.target.value);
-              if (!isNaN(val) && val > 0 && val <= maxStock) {
-                updateQuantity(product.id, val, selectedVariant);
-              }
-            }}
-            className="w-12 mx-2 text-center border border-gray-300 rounded-md p-1"
+            value={localQuantity.toString()}
+            onChange={(e) => handleQuantityChange(e.target.value)}
+            className="w-12 mx-2 text-center border border-gray-300 rounded-md p-1 text-sm"
           />
 
           <button
             onClick={handleIncrement}
-            disabled={quantity >= maxStock}
+            disabled={localQuantity >= maxStock}
             className={`p-1.5 border rounded-full ${
-              quantity >= maxStock
+              localQuantity >= maxStock
                 ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100'
                 : 'border-gray-300 text-gray-700 hover:bg-gray-100'
             }`}
@@ -144,15 +188,11 @@ const CartItem: React.FC<CartItemProps> = ({ item }) => {
           </button>
         </div>
 
-        <div className="font-semibold text-sm sm:text-base">{formatPrice(price * quantity)}</div>
+        <div className="font-semibold text-sm sm:text-base">
+          {formatPrice(price * localQuantity)}
+        </div>
 
-        <button
-          onClick={handleRemove}
-          className="text-gray-400 hover:text-red-600 transition"
-          aria-label="Supprimer"
-        >
-          <Trash size={18} />
-        </button>
+       
       </div>
     </div>
   );

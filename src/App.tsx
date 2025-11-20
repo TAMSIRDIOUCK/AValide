@@ -23,9 +23,9 @@ import ReturnsPage from './pages/ReturnsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import AddServicePage from './pages/seller/AddServicePage';
-import ServiceDetailPage from './pages/services/ServiceDetailPage'; // Correction de l'import manquant
+import ServiceDetailPage from './pages/services/ServiceDetailPage'; // Import
 
-// Composant de route protégée : exige seulement que l'utilisateur soit connecté
+// Composant de route protégée : exige que l'utilisateur soit connecté
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
@@ -33,7 +33,13 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Chargement...
+      </div>
+    );
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
@@ -44,47 +50,33 @@ function App() {
     <>
       <Header />
       <Routes>
+        {/* Pages publiques */}
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/categories" element={<SearchResultsPage />} />
         <Route path="/category/:id" element={<CategoryPage />} />
-        <Route path="/orders" element={<MyOrdersPage />} />
         <Route path="/faq" element={<FaqPage />} />
         <Route path="/shipping" element={<ShippingPage />} />
         <Route path="/returns" element={<ReturnsPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/seller/services/add" element={ <ProtectedRoute>
-              <AddServicePage />
-            </ProtectedRoute>} />
-            <Route path="/services/:id" element={
-            <ProtectedRoute>
-              <ServiceDetailPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/services/:id" element={<ServiceDetailPage />} />
 
+        {/* ✅ Achat accessible sans connexion */}
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/order-success" element={<OrderSuccessPage />} />
+
+        {/* Pages nécessitant une connexion */}
         <Route
-          path="/checkout"
+          path="/orders"
           element={
             <ProtectedRoute>
-              <CheckoutPage />
+              <MyOrdersPage />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/order-success"
-          element={
-            <ProtectedRoute>
-              <OrderSuccessPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Routes accessibles à tout utilisateur connecté */}
         <Route
           path="/seller/dashboard"
           element={
@@ -106,6 +98,14 @@ function App() {
           element={
             <ProtectedRoute>
               <EditProductPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/seller/services/add"
+          element={
+            <ProtectedRoute>
+              <AddServicePage />
             </ProtectedRoute>
           }
         />
