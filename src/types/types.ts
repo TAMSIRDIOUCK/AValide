@@ -1,67 +1,78 @@
-// src/types/types.ts
-
-// ✅ Type pour les variantes de produit (taille, couleur, stock, prix)
 export interface ProductVariant {
-  id?: string;          // ID optionnel (peut venir de Supabase)
-  size: string;         // Taille de la variante (ex: "M", "L")
-  color: string;        // Couleur de la variante
-  price?: number;       // Prix spécifique à la variante (facultatif)
-  stock?: number;       // Stock spécifique à la variante (facultatif)
+  id?: string;
+  size: string;
+  color: string;
+  price?: number;
+  stock?: number;
 }
 
-// ✅ Type principal pour les produits
+// Produit principal
 export interface Product {
   id: string;
   title: string;
   description: string;
-  price: number;                   // Prix par défaut si aucune variante
-  images: string[];                // Chemins locaux ou URL
-  images_urls?: string[];          // URL uploadées vers Supabase
+  price: number;
+  images: string[];
+  images_urls?: string[];
   rating: number;
   reviewCount: number;
   createdAt: string;
   category: string;
   sellerId: string;
-  sellerName?: string;             // Nom du vendeur
-  stock: number;                   // Stock global si pas de variantes
+  sellerName?: string;
+  seller_phone?: string; // Add seller_phone as an optional property
+  stock: number;
   likes: number;
-  isFromChina?: boolean;           // Produit venant de Chine
-  variants?: ProductVariant[];     // Liste des variantes disponibles
+  isFromChina?: boolean;
+  variants?: ProductVariant[];
 }
 
-// ✅ Type pour les items du panier
+// Item du panier
 export interface CartItem {
-  product: Product;                 // Produit complet
-  quantity: number;                 // Quantité choisie
-  sellerId: string;                 // ID du vendeur
-  selectedVariant?: ProductVariant; // Variante sélectionnée par le client
+  product: Product;
+  quantity: number;
+  sellerId: string;
+  selectedVariant?: ProductVariant;
 }
 
-// ✅ Type pour les commandes
+// ------------ Types Commandes ------------
+
+// Item d’une commande (tel que Supabase le renvoie)
+export interface OrderItem {
+  id: string;
+  order_id: string;            // 🔥 ajouté
+  created_at: string;          // 🔥 ajouté par Supabase automatiquement
+
+  productId: string;
+  sellerId: string;
+  title: string;
+  images: string[];
+  quantity: number;
+  price: number;
+  status: string;
+
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+
+  selectedVariant?: ProductVariant; // Variant sélectionnée
+}
+
+// Commande complète
 export interface Order {
   id: string;
   userId: string;
   createdAt: string;
   total: number;
+
   customerName: string;
   customerPhone: string;
   customerAddress: string;
   customerEmail?: string;
   additionalInfo?: string;
+
   paymentMethod: string;
   status: string;
-  items: {
-    id: string;
-    productId: string;
-    sellerId: string;
-    title: string;
-    images: string[];
-    quantity: number;
-    price: number;                   // Prix réel de l'article (variant ou produit)
-    status: string;
-    customerName: string;
-    customerPhone: string;
-    customerAddress: string;
-    selectedVariant?: ProductVariant; // Variante sélectionnée
-  }[];
+
+  items: OrderItem[];
 }

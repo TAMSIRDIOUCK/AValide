@@ -1,8 +1,10 @@
 // src/App.tsx
-
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { registerServiceWorker } from './lib/firebaseMessaging';
+import { requestFirebasePermission } from './lib/requestPermission';
+import { supabase } from './lib/supabaseClient';
 
 import Header from './components/layout/Header';
 import HomePage from './pages/HomePage';
@@ -23,9 +25,10 @@ import ReturnsPage from './pages/ReturnsPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import AddServicePage from './pages/seller/AddServicePage';
-import ServiceDetailPage from './pages/services/ServiceDetailPage'; // Import
+import ServiceDetailPage from './pages/services/ServiceDetailPage';
+import ProductDetailPageWrapper from './pages/products/ProductDetailPageWrapper';
 
-// Composant de route protégée : exige que l'utilisateur soit connecté
+// --- Composant route protégée ---
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
@@ -45,7 +48,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
-function App() {
+const App: React.FC = () => {
+  const { user } = useAuth(); // récupère l’utilisateur connecté
+
+  useEffect(() => {
+    const initFirebase = async () => {
+      await registerServiceWorker();
+  
+      // ⚡ Récupérer l'utilisateur avec await
+      const { data } = await supabase.auth.getUser();
+      const userId = user?.id || data?.user?.id; // user connecté via useAuth ou Supabase
+  
+      await requestFirebasePermission(userId);
+    };
+  
+    initFirebase();
+  }, [user]);
+  
+
   return (
     <>
       <Header />
@@ -64,7 +84,10 @@ function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/services/:id" element={<ServiceDetailPage />} />
 
-        {/* ✅ Achat accessible sans connexion */}
+        {/* Détail produit */}
+        <Route path="/products/:id" element={<ProductDetailPageWrapper />} />
+
+        {/* Achat accessible sans connexion */}
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/order-success" element={<OrderSuccessPage />} />
 
@@ -115,6 +138,6 @@ function App() {
       </Routes>
     </>
   );
-}
+};
 
 export default App;

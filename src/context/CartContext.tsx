@@ -1,68 +1,74 @@
 // src/context/CartContext.tsx
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product } from '../types/types';
+import { supabase } from '../lib/supabaseClient'; // Assuming supabaseClient is where Supabase is initialized
 
-// ✅ Type pour la variante dans le panier
+// -----------------------------
+// ✅ Type pour une variante
+// -----------------------------
 export type Variant = {
-  id?: string;
   size: string;
   color: string;
   price?: number;
   stock?: number;
 };
 
-// ✅ Type pour un article du panier
+// -----------------------------
+// ✅ Type pour un item du panier
+// -----------------------------
 export type CartItem = {
   product: Product;
   quantity: number;
-  sellerId: string;
   selectedVariant?: Variant;
   cartItemId: string;
 };
 
+// -----------------------------
+// ✅ Type du contexte
+// -----------------------------
 interface CartContextType {
   cartItems: CartItem[];
   addItem: (product: Product, quantity?: number, variant?: Variant) => void;
   removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
-  updateVariant: (cartItemId: string, newVariant: Variant) => void;
+  updateVariant: (cartItemId: string, variant: Variant) => void;
   clearCart: () => void;
   itemCount: number;
   total: number;
 }
 
+// -----------------------------
+// 🔹 Création du contexte
+// -----------------------------
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// -----------------------------
+// ✅ Fournisseur du contexte
+// -----------------------------
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // 🔹 Charger le panier depuis localStorage
+  // Charger le panier depuis localStorage
   useEffect(() => {
     try {
-      const savedCart = localStorage.getItem('avalideCart');
-      if (savedCart) {
-        setCartItems(JSON.parse(savedCart));
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement du panier depuis localStorage :', error);
+      const saved = localStorage.getItem('avalideCart');
+      if (saved) setCartItems(JSON.parse(saved));
+    } catch (err) {
+      console.error('Erreur chargement panier :', err);
       setCartItems([]);
     }
   }, []);
 
-  // 🔹 Sauvegarder automatiquement dans localStorage
+  // Sauvegarder automatiquement
   useEffect(() => {
     localStorage.setItem('avalideCart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  // ✅ Ajouter un produit au panier
+  // Ajouter un produit
   const addItem = (product: Product, quantity = 1, variant?: Variant) => {
-    if (!product) return;
-    const sellerId = product.sellerId;
-
-    setCartItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) =>
+    setCartItems(prev => {
+      const existing = prev.find(
+        item =>
           item.product.id === product.id &&
           (variant
             ? item.selectedVariant?.size === variant.size &&
@@ -72,53 +78,48 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const maxStock = variant?.stock ?? product.stock ?? Infinity;
 
-      if (existingItem) {
-        const newQty = existingItem.quantity + quantity;
+      if (existing) {
+        const newQty = existing.quantity + quantity;
         if (newQty > maxStock) {
-          alert(`Stock limité. Seulement ${maxStock} en stock.`);
-          return currentItems;
+          alert(`Stock limité. Seulement ${maxStock} disponible.`);
+          return prev;
         }
-        return currentItems.map((item) =>
-          item === existingItem ? { ...item, quantity: newQty } : item
-        );
-      } else {
-        if (quantity > maxStock) {
-          alert(`Stock limité. Seulement ${maxStock} en stock.`);
-          return currentItems;
-        }
-
-        return [
-          ...currentItems,
-          {
-            product,
-            quantity,
-            sellerId,
-            selectedVariant: variant || undefined,
-            cartItemId: `${product.id}-${variant?.size ?? ''}-${variant?.color ?? ''}-${Date.now()}`,
-          },
-        ];
+        return prev.map(i => (i === existing ? { ...i, quantity: newQty } : i));
       }
+
+      if (quantity > maxStock) {
+        alert(`Stock limité. Seulement ${maxStock} disponible.`);
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          product,
+          quantity,
+          selectedVariant: variant,
+          cartItemId: `${product.id}-${variant?.size ?? ''}-${variant?.color ?? ''}-${Date.now()}`,
+        },
+      ];
     });
   };
 
-  // ✅ Supprimer un produit du panier
+  // Supprimer
   const removeItem = (cartItemId: string) => {
-    setCartItems((currentItems) =>
-      currentItems.filter((item) => item.cartItemId !== cartItemId)
-    );
+    setCartItems(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
-  // ✅ Mettre à jour la quantité d’un produit
+  // Mettre à jour la quantité
   const updateQuantity = (cartItemId: string, quantity: number) => {
-    setCartItems((currentItems) =>
-      currentItems.map((item) => {
+    setCartItems(prev =>
+      prev.map(item => {
         if (item.cartItemId === cartItemId) {
           const maxStock = item.selectedVariant?.stock ?? item.product.stock ?? Infinity;
           if (quantity > maxStock) {
-            alert(`Stock insuffisant. Seulement ${maxStock} en stock.`);
+            alert(`Stock limité. Seulement ${maxStock} disponible.`);
             return item;
           }
-          if (quantity <= 0) return item;
+          if (quantity < 1) return item;
           return { ...item, quantity };
         }
         return item;
@@ -126,30 +127,44 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  // ✅ Mettre à jour la variante (taille, couleur)
-  const updateVariant = (cartItemId: string, newVariant: Variant) => {
-    setCartItems((currentItems) =>
-      currentItems.map((item) =>
+  // Mettre à jour la variante
+  const updateVariant = async (cartItemId: string, variant: Variant) => {
+    setCartItems(prev =>
+      prev.map(item =>
         item.cartItemId === cartItemId
-          ? { ...item, selectedVariant: newVariant, quantity: 1 }
+          ? { ...item, selectedVariant: variant, quantity: 1 } // reset quantité sur changement variant
           : item
       )
     );
+
+    try {
+      const { data, error } = await supabase
+        .from('cart_items')
+        .update({ selectedVariant: variant })
+        .eq('cartItemId', cartItemId);
+
+      if (error) {
+        console.error('Erreur lors de la mise à jour de la variante dans Supabase :', error);
+      } else {
+        console.log('Variante mise à jour avec succès dans Supabase :', data);
+      }
+    } catch (err) {
+      console.error('Erreur inattendue lors de la mise à jour de la variante :', err);
+    }
   };
 
-  // ✅ Vider tout le panier
+  // Vider le panier
   const clearCart = () => {
     setCartItems([]);
     localStorage.removeItem('avalideCart');
   };
 
-  // 🔹 Calcul du nombre total d’articles
+  // Nombre d’articles
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // 🔹 Calcul du total global
+  // Total
   const total = cartItems.reduce(
-    (sum, item) =>
-      sum + (item.selectedVariant?.price ?? item.product.price) * item.quantity,
+    (sum, item) => sum + (item.selectedVariant?.price ?? item.product.price) * item.quantity,
     0
   );
 
@@ -171,9 +186,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-// ✅ Hook personnalisé pour accéder facilement au panier
-export const useCart = (): CartContextType => {
+// Hook
+export const useCart = () => {
   const context = useContext(CartContext);
-  if (!context) throw new Error('useCart must be used within a CartProvider');
+  if (!context) throw new Error('useCart must be used within CartProvider');
   return context;
 };

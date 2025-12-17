@@ -26,10 +26,12 @@ const AddProductPage: React.FC = () => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFromChina, setIsFromChina] = useState(false);
+  const [sellerPhone, setSellerPhone] = useState('');
 
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
+  // ----- UPLOAD IMAGES -----
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const urls = acceptedFiles.map((file) => URL.createObjectURL(file));
     setPreviewUrls((prev) => [...prev, ...urls]);
@@ -38,7 +40,7 @@ const AddProductPage: React.FC = () => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
+    accept: { "image/*": ['.jpg', '.jpeg', '.png', '.webp'] },
     maxFiles: 20,
     maxSize: 20 * 1024 * 1024,
   });
@@ -51,11 +53,13 @@ const AddProductPage: React.FC = () => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // ----- CATEGORIE CHINE -----
   const handleChinaToggle = () => {
     setIsFromChina(!isFromChina);
-    setCategory(!isFromChina ? 'chine' : '');
+    setCategory(!isFromChina ? "chine" : "");
   };
 
+  // ----- LISTES -----
   const sizesList = ['M', 'L', 'XL', 'XXL', '36', '37', '38', '39', '40', '41'];
   const colorsList = [
     { name: 'Rouge', color: '#FF0000' },
@@ -65,6 +69,7 @@ const AddProductPage: React.FC = () => {
     { name: 'Blanc', color: '#FFFFFF' },
   ];
 
+  // ----- SELECT VARIANTS -----
   const toggleSize = (size: string) => {
     setSelectedSizes((prev) =>
       prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
@@ -77,31 +82,32 @@ const AddProductPage: React.FC = () => {
     );
   };
 
+  // ===== SUBMIT =====
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user || !user.id) {
-      alert('Vous devez être connecté pour publier un produit.');
+      alert("Vous devez être connecté pour publier un produit.");
       return;
     }
-
-    if (!title.trim() || !description.trim() || !price || !category) {
-      alert('Tous les champs sont obligatoires.');
+    if (!title.trim() || !description.trim() || !price || !category || !sellerPhone) {
+      alert("Tous les champs sont obligatoires, y compris le numéro de téléphone.");
       return;
     }
-
     if (files.length < 2) {
-      alert('Ajoutez au moins 2 images pour publier.');
+      alert("Ajoutez au moins 2 images.");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      // 1️⃣ Upload images
       const imageUrls = await uploadProductImages(files);
 
-      // Génération automatique des variantes combinant tailles et couleurs
+      // 2️⃣ Générer les variantes
       let variants: LocalVariant[] = [];
+
       if (selectedSizes.length && selectedColors.length) {
         selectedSizes.forEach((size) => {
           selectedColors.forEach((color) => {
@@ -109,18 +115,19 @@ const AddProductPage: React.FC = () => {
           });
         });
       } else if (selectedSizes.length) {
-        variants = selectedSizes.map((size) => ({ size, color: '' }));
+        variants = selectedSizes.map((size) => ({ size, color: "" }));
       } else if (selectedColors.length) {
-        variants = selectedColors.map((color) => ({ size: '', color }));
+        variants = selectedColors.map((color) => ({ size: "", color }));
       } else {
-        variants = [{ size: '', color: '' }]; // Pas de taille ni couleur
+        variants = [{ size: "", color: "" }];
       }
 
-      const { error } = await supabase.from('products').insert([
+      // 3️⃣ Insert product
+      const { error } = await supabase.from("products").insert([
         {
           title,
           description,
-          price: parseFloat(price),
+          price: Number(price),
           stock,
           category,
           images_urls: imageUrls,
@@ -130,32 +137,34 @@ const AddProductPage: React.FC = () => {
           review_count: 0,
           featured: true,
           is_from_china: isFromChina,
-          variants,
+          variants, // <= 🔥 LES VARIANTES SONT ENREGISTRÉES ICI
+          seller_phone: sellerPhone, // Include seller phone number
         },
       ]);
 
       if (error) {
-        console.error('Erreur insertion produit :', error.message);
-        alert(`Erreur : ${error.message}`);
-      } else {
-        alert('✅ Produit publié avec succès !');
-        navigate('/seller/dashboard');
+        console.error(error);
+        alert("Erreur : " + error.message);
+        return;
       }
+
+      alert("Produit publié avec succès !");
+      navigate("/seller/dashboard");
+
     } catch (err: any) {
-      console.error('Erreur inconnue :', err.message || err);
-      alert('Une erreur est survenue.');
+      alert("Erreur : " + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const categoriesList = [
-    { id: 'vetement', name: 'Vêtements 👕' },
-    { id: 'accessoire', name: 'Accessoires 💍' },
-    { id: 'meuble', name: 'Meubles 🪑' },
-    { id: 'enfant', name: 'Enfants 🧸' },
-    { id: 'chine', name: 'Produits de Chine 🇨🇳' },
-    { id: 'autre', name: 'Autres 🛍️' },
+    { id: "vetement", name: "Vêtements 👕" },
+    { id: "accessoire", name: "Accessoires 💍" },
+    { id: "meuble", name: "Meubles 🪑" },
+    { id: "enfant", name: "Enfants 🧸" },
+    { id: "chine", name: "Produits de Chine 🇨🇳" },
+    { id: "autre", name: "Autres 🛍️" },
   ];
 
   return (
@@ -167,13 +176,13 @@ const AddProductPage: React.FC = () => {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          
           <input
             type="text"
             placeholder="Nom du produit"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="w-full p-2 border rounded"
-            required
           />
 
           <textarea
@@ -181,7 +190,6 @@ const AddProductPage: React.FC = () => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full p-2 border rounded"
-            required
           />
 
           <input
@@ -190,46 +198,46 @@ const AddProductPage: React.FC = () => {
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className="w-full p-2 border rounded"
-            min={0}
-            required
           />
 
           <input
             type="number"
-            placeholder="Stock global"
+            placeholder="Stock"
             value={stock}
-            onChange={(e) => setStock(parseInt(e.target.value))}
+            onChange={(e) => setStock(Number(e.target.value))}
             className="w-full p-2 border rounded"
-            min={0}
-            required
           />
 
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="w-full p-2 border rounded"
-            required
             disabled={isFromChina}
           >
             <option value="">Sélectionnez une catégorie</option>
-            {categoriesList.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
+            {categoriesList.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
 
-          {/* ✅ Tailles */}
+          <input
+            type="tel"
+            placeholder="Numéro de téléphone du vendeur"
+            value={sellerPhone}
+            onChange={(e) => setSellerPhone(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+          />
+
+          {/* Tailles */}
           <div>
-            <label className="text-sm font-medium text-gray-700">Tailles disponibles</label>
+            <h3 className="text-sm font-medium">Tailles</h3>
             <div className="grid grid-cols-4 gap-2 mt-2">
               {sizesList.map((size) => (
-                <label key={size} className="flex items-center space-x-2">
+                <label key={size} className="flex space-x-2 items-center">
                   <input
                     type="checkbox"
                     checked={selectedSizes.includes(size)}
                     onChange={() => toggleSize(size)}
-                    className="form-checkbox"
                   />
                   <span>{size}</span>
                 </label>
@@ -237,82 +245,69 @@ const AddProductPage: React.FC = () => {
             </div>
           </div>
 
-          {/* ✅ Couleurs */}
+          {/* Couleurs */}
           <div>
-            <label className="text-sm font-medium text-gray-700">Couleurs disponibles</label>
+            <h3 className="text-sm font-medium">Couleurs</h3>
             <div className="grid grid-cols-4 gap-2 mt-2">
               {colorsList.map((c) => (
-                <label key={c.name} className="flex items-center space-x-2">
+                <label key={c.name} className="flex space-x-2 items-center">
                   <input
                     type="checkbox"
                     checked={selectedColors.includes(c.name)}
                     onChange={() => toggleColor(c.name)}
-                    className="form-checkbox"
                     style={{ accentColor: c.color }}
                   />
-                  <span className="flex items-center space-x-1">
+                  <span className="flex items-center gap-1">
                     <span
                       className="w-4 h-4 rounded-full border"
                       style={{ backgroundColor: c.color }}
-                    ></span>
-                    <span>{c.name}</span>
+                    />
+                    {c.name}
                   </span>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Zone d’upload */}
+          {/* Upload */}
           <div
             {...getRootProps()}
-            className="border-2 border-dashed border-gray-400 p-4 rounded cursor-pointer text-center"
+            className="p-4 border-2 border-dashed rounded text-center cursor-pointer"
           >
             <input {...getInputProps()} />
-            {isDragActive ? (
-              <p>Déposez les images ici...</p>
-            ) : (
-              <p className="flex items-center justify-center gap-2">
-                <Upload className="w-5 h-5" />
-                Glissez-déposez ou cliquez pour sélectionner vos images
-              </p>
-            )}
+            {isDragActive ? <p>Déposez les images...</p> : <p>Glissez-déposez ou cliquez</p>}
           </div>
 
-          {/* Aperçu des images */}
-          <div className="flex flex-wrap gap-4 mt-4">
-            {previewUrls.map((url, index) => (
-              <div key={index} className="relative">
-                <img src={url} alt={`preview-${index}`} className="w-24 h-24 object-cover rounded" />
+          <div className="flex flex-wrap gap-4 mt-2">
+            {previewUrls.map((url, i) => (
+              <div key={i} className="relative">
+                <img src={url} className="w-24 h-24 rounded object-cover" />
                 <button
-                  type="button"
-                  onClick={() => removeImage(index)}
-                  className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1"
+                  className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full"
+                  onClick={() => removeImage(i)}
                 >
-                  <X size={16} />
+                  <X size={14} />
                 </button>
               </div>
             ))}
           </div>
 
-          {/* Produit de Chine */}
-          <div className="mb-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={isFromChina}
-                onChange={handleChinaToggle}
-                className="form-checkbox"
-              />
-              <span>Ce produit vient de Chine 🇨🇳</span>
-            </label>
-          </div>
+          {/* Produit Chine */}
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={isFromChina}
+              onChange={handleChinaToggle}
+            />
+            <span>Produit de Chine 🇨🇳</span>
+          </label>
 
           <button
             type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
             disabled={isSubmitting}
+            className="bg-blue-600 text-white p-2 rounded w-full"
           >
-            {isSubmitting ? 'Publication...' : 'Publier le produit'}
+            {isSubmitting ? "Publication..." : "Publier"}
           </button>
         </form>
       </div>
