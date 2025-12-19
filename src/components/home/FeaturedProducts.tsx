@@ -101,7 +101,6 @@ const FeaturedProducts: React.FC = () => {
           </p>
         </div>
 
-        {/* Boutons de catégories */}
         <div className="flex flex-wrap justify-center gap-3 mb-10">
           <button
             onClick={() => setSelectedCategory('tous')}
@@ -129,7 +128,6 @@ const FeaturedProducts: React.FC = () => {
           ))}
         </div>
 
-        {/* Affichage produits */}
         {loading ? (
           <p className="text-center text-gray-500">Chargement des produits...</p>
         ) : filteredProducts.length === 0 ? (
@@ -147,7 +145,6 @@ const FeaturedProducts: React.FC = () => {
                   </div>
                 )}
 
-                {/* Like */}
                 <button
                   onClick={() => toggleLike(product.id)}
                   className="absolute top-2 right-2 z-10 p-1 rounded-full bg-white shadow"
@@ -162,7 +159,6 @@ const FeaturedProducts: React.FC = () => {
                   />
                 </button>
 
-                {/* Images produit */}
                 <div
                   className="cursor-pointer w-full aspect-w-1 aspect-h-1 overflow-hidden rounded-lg"
                   onClick={() => navigate(`/products/${product.id}`)}
@@ -180,7 +176,6 @@ const FeaturedProducts: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Infos produit */}
                 <div className="p-4">
                   <h3
                     className="font-semibold text-lg mb-1 truncate cursor-pointer"
@@ -203,36 +198,31 @@ const FeaturedProducts: React.FC = () => {
                     {formatPrice(product.price)}
                   </p>
 
-                  {/* Contact et bouton Acheter */}
-                  <div className="flex items-center gap-3 mt-2">
+                  {/* Contact + Acheter (RESPONSIVE FIX) */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
                     {product.seller_phone && (
-                      <>
-                        {/* WhatsApp */}
+                      <div className="flex gap-3">
                         <a
                           href={`https://wa.me/${product.seller_phone}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title="Contacter sur WhatsApp"
                           className="text-green-600 hover:text-green-800"
                         >
                           <MessageCircle size={24} />
                         </a>
 
-                        {/* Appel */}
                         <a
                           href={`tel:${product.seller_phone}`}
-                          title="Appeler le vendeur"
                           className="text-blue-600 hover:text-blue-800"
                         >
                           <Phone size={24} />
                         </a>
-                      </>
+                      </div>
                     )}
 
-                    {/* Acheter */}
                     <button
                       onClick={() => navigate(`/products/${product.id}`)}
-                      className="ml-auto bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition font-medium"
+                      className="w-full sm:w-auto sm:ml-auto bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition font-medium"
                     >
                       Acheter
                     </button>
