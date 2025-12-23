@@ -2,8 +2,7 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { registerServiceWorker } from './lib/firebaseMessaging';
-import { requestFirebasePermission } from './lib/requestPermission';
+import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
 import { supabase } from './lib/supabaseClient';
 
 import Header from './components/layout/Header';
@@ -53,18 +52,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initFirebase = async () => {
+      // 1️⃣ Enregistrer le service worker
       await registerServiceWorker();
-  
-      // ⚡ Récupérer l'utilisateur avec await
-      const { data } = await supabase.auth.getUser();
-      const userId = user?.id || data?.user?.id; // user connecté via useAuth ou Supabase
-  
-      await requestFirebasePermission(userId);
+
+      // 2️⃣ Demander la permission et enregistrer le token du vendeur
+      await requestNotificationPermission();
     };
-  
+
     initFirebase();
   }, [user]);
-  
 
   return (
     <>
