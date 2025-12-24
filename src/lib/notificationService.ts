@@ -1,6 +1,8 @@
 import { supabase } from "./supabaseClient";
 
-// 🔹 Récupère tous les tokens FCM associés à un vendeur
+/**
+ * Récupère tous les tokens FCM d'un vendeur
+ */
 export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> => {
   const { data, error } = await supabase
     .from("user_tokens")
@@ -15,8 +17,10 @@ export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> =>
   return data?.map((item) => item.fcm_token) || [];
 };
 
-// 🔹 Envoie une notification à plusieurs tokens FCM
-export const sendFcmNotification = async (
+/**
+ * Envoie une notification à tous les tokens d'un vendeur
+ */
+export const sendNotificationToSeller = async (
   sellerId: string,
   title: string,
   body: string
@@ -24,16 +28,13 @@ export const sendFcmNotification = async (
   const tokens = await getSellerFcmTokens(sellerId);
 
   if (!tokens.length) {
-    console.log("⚠️ Aucun token trouvé pour ce vendeur");
+    console.log("⚠️ Aucun token FCM trouvé pour ce vendeur");
     return;
   }
 
   const message = {
     registration_ids: tokens,
-    notification: {
-      title,
-      body,
-    },
+    notification: { title, body },
   };
 
   try {
@@ -51,11 +52,4 @@ export const sendFcmNotification = async (
   } catch (error) {
     console.error("Erreur en envoyant la notification :", error);
   }
-};
-
-/**
- * Exemple : envoyer une notification quand une commande est passée
- */
-export const notifySeller = async (sellerId: string, orderId: string) => {
-  await sendFcmNotification(sellerId, "Nouvelle commande", "Vous avez une nouvelle commande !");
 };

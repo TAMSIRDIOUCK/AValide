@@ -1,7 +1,7 @@
 // src/utils/orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
-import { getSellerFcmTokens, sendNotification } from '../lib/notificationService';
+import { getSellerFcmTokens, sendNotificationToSeller } from '../lib/notificationService';
 import { v4 as uuidv4 } from 'uuid';
 
 //////////////////////////////////////////////////////////////
@@ -240,8 +240,8 @@ export const createOrder = async (orderData: any) => {
       Object.entries(itemsBySeller).map(async ([sellerId, items]) => {
         const tokens = await getSellerFcmTokens(sellerId);
         if (tokens && tokens.length > 0) {
-          await sendNotification(
-            tokens,
+          await sendNotificationToSeller(
+            sellerId,
             "Nouvelle commande !",
             `Vous avez reçu une nouvelle commande (${items.length} produit${items.length > 1 ? 's' : ''}).`
           );
