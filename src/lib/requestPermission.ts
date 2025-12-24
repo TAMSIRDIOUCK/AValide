@@ -1,45 +1,70 @@
 import { getToken } from "firebase/messaging";
-import { messaging } from "./firebase"; // ton firebase.ts
+import { messaging } from "./firebase";
 import { supabase } from "./supabaseClient";
 
-// Fonction pour sauvegarder le token FCM dans Supabase
-export const saveFcmToken = async (token: string, userId?: string) => {
+/**
+ * Sauvegarde le token FCM du vendeur dans Supabase
+ */
+export const saveFcmToken = async (
+  token: string,
+  sellerId: string
+) => {
   try {
+    if (!sellerId) {
+      console.error("❌ sellerId manquant");
+      return;
+    }
+
     const { data, error } = await supabase
       .from("user_tokens")
       .insert({
-        user_id: userId ?? null,
+        seller_id: sellerId, // ✅ COLONNE CORRECTE
         fcm_token: token,
       });
 
-    if (error) console.error("Erreur en enregistrant le token FCM:", error);
-    else console.log("Token FCM enregistré :", data);
+    if (error) {
+      console.error("❌ Erreur en enregistrant le token FCM:", error);
+    } else {
+      console.log("✅ Token FCM enregistré dans Supabase :", data);
+    }
   } catch (err) {
-    console.error("Erreur saveFcmToken:", err);
+    console.error("❌ Erreur saveFcmToken:", err);
   }
 };
 
-// Fonction pour demander la permission de notifications et récupérer le token FCM
-export const requestFirebasePermission = async (userId?: string): Promise<string | null> => {
+/**
+ * Demande la permission de notifications et récupère le token FCM
+ */
+export const requestFirebasePermission = async (
+  sellerId: string
+): Promise<string | null> => {
   try {
+    // 1️⃣ Demande la permission
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
-      console.warn("Permission de notification non accordée");
+      console.warn("⚠️ Permission de notification refusée");
       return null;
     }
 
+    // 2️⃣ Récupérer le token FCM
     const token = await getToken(messaging, {
-      vapidKey: "BJlVg5_LEHb_7zkGLf2v5tRefZZ_WKzLz_0Az4U6qW_2HUWDqmF4ldpB9-8SvLJpFdLmUzSdk5i4NQmYna9xgNA",
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
     });
 
-    if (token) {
-      console.log("FCM Token obtenu :", token);
-      await saveFcmToken(token, userId);
+    if (!token) {
+      console.error("❌ Token FCM non généré");
+      return null;
     }
+
+    console.log("🔥 FCM Token obtenu :", token);
+    console.log("👤 Seller ID :", sellerId);
+
+    // 3️⃣ Sauvegarder dans Supabase
+    await saveFcmToken(token, sellerId);
 
     return token;
   } catch (err) {
-    console.error("Erreur requestFirebasePermission:", err);
+    console.error("❌ Erreur requestFirebasePermission:", err);
     return null;
   }
 };

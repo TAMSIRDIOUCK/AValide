@@ -1,19 +1,22 @@
 import { supabase } from "./supabaseClient";
 
-// 🔹 Récupère tous les tokens FCM associés à un vendeur
-export const getSellerFcmTokens = async (sellerId: string) => {
+/**
+ * 🔹 Récupère tous les tokens FCM associés à un vendeur
+ */
+export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> => {
   const { data, error } = await supabase
     .from("user_tokens")
     .select("fcm_token")
-    .eq("user_id", sellerId);
+    .eq("seller_id", sellerId); // ✅ BON CHAMP
 
   if (error) {
-    console.error("Erreur en récupérant les tokens FCM du vendeur :", error);
+    console.error("❌ Erreur récupération tokens FCM :", error);
     return [];
   }
 
-  return data?.map(item => item.fcm_token) || [];
+  return data?.map(item => item.fcm_token) ?? [];
 };
+
 
 // 🔹 Envoie une notification à plusieurs tokens FCM
 export const sendNotification = async (
