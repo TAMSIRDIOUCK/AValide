@@ -1,11 +1,11 @@
-import { getToken } from "firebase/messaging";
-import { messaging } from "./firebase";
+import { getToken, Messaging } from "firebase/messaging";
+import type { Messaging as MessagingType } from "firebase/messaging";
+import { messaging } from "./firebase"; // ✅ Type déjà défini dans firebase.ts
 import { supabase } from "./supabaseClient";
 
-/**
- * Enregistre le service worker pour les notifications
- */
-export const registerServiceWorker = async () => {
+const fbMessaging: MessagingType = messaging; // ✅ précise le type ici pour TS
+
+export const registerServiceWorker = async (): Promise<void> => {
   if ("serviceWorker" in navigator) {
     try {
       const registration = await navigator.serviceWorker.register(
@@ -20,19 +20,16 @@ export const registerServiceWorker = async () => {
   }
 };
 
-/**
- * Demande la permission de notifications et enregistre le token FCM du vendeur
- */
-export const requestNotificationPermission = async () => {
+export const requestNotificationPermission = async (): Promise<void> => {
   try {
-    // 1️⃣ Demande de permission
     const permission = await Notification.requestPermission();
+    console.log("📌 Permission demandée:", permission);
+
     if (permission !== "granted") {
-      console.log("⚠️ Permission notifications refusée");
+      console.warn("⚠️ Permission notifications refusée");
       return;
     }
 
-    // 2️⃣ Récupérer le vendeur connecté
     const {
       data: { user },
       error: userError,
@@ -50,10 +47,15 @@ export const requestNotificationPermission = async () => {
 
     console.log("✅ Vendeur connecté :", user.email, user.id);
 
-    // 3️⃣ Récupérer le token FCM
-    const token = await getToken(messaging, {
-      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
-    });
+    let token: string | null = null;
+    try {
+      token = await getToken(fbMessaging, {
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY as string,
+      });
+    } catch (tokenError) {
+      console.error("❌ Erreur lors de la récupération du token FCM :", tokenError);
+      return;
+    }
 
     if (!token) {
       console.warn("⚠️ Impossible de récupérer le token FCM");
@@ -62,21 +64,24 @@ export const requestNotificationPermission = async () => {
 
     console.log("🔹 TOKEN FCM obtenu :", token);
 
-    // 4️⃣ Enregistrer le token dans Supabase en utilisant upsert pour gérer les doublons
-    const { error: upsertError } = await supabase
-      .from("user_tokens")
-      .upsert(
-        {
-          seller_id: user.id,
-          fcm_token: token,
-        },
-        { onConflict: "fcm_token" } // ⚡ ici on précise la colonne unique
-      );
+    try {
+      const { error: upsertError } = await supabase
+        .from("user_tokens")
+        .upsert(
+          {
+            seller_id: user.id,
+            fcm_token: token,
+          },
+          { onConflict: "fcm_token" }
+        );
 
-    if (upsertError) {
-      console.error("❌ Erreur upsert token Supabase :", upsertError);
-    } else {
-      console.log("✅ Token FCM vendeur enregistré/upserté dans Supabase");
+      if (upsertError) {
+        console.error("❌ Erreur upsert token Supabase :", upsertError);
+      } else {
+        console.log("✅ Token FCM vendeur enregistré/upserté dans Supabase");
+      }
+    } catch (dbError) {
+      console.error("❌ Exception lors de l'enregistrement du token :", dbError);
     }
 
   } catch (err) {
