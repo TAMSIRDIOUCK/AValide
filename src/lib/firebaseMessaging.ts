@@ -62,21 +62,21 @@ export const requestNotificationPermission = async () => {
 
     console.log("🔹 TOKEN FCM obtenu :", token);
 
-    // 4️⃣ Enregistrer le token dans Supabase
-    const { error: insertError } = await supabase.from("user_tokens").upsert(
-      {
-        seller_id: user.id,
-        fcm_token: token,
-      },
-      {
-        onConflict: "fcm_token", // évite doublons
-      }
-    );
+    // 4️⃣ Enregistrer le token dans Supabase en utilisant upsert pour gérer les doublons
+    const { error: upsertError } = await supabase
+      .from("user_tokens")
+      .upsert(
+        {
+          seller_id: user.id,
+          fcm_token: token,
+        },
+        { onConflict: "fcm_token" } // ⚡ ici on précise la colonne unique
+      );
 
-    if (insertError) {
-      console.error("❌ Erreur insertion token Supabase :", insertError);
+    if (upsertError) {
+      console.error("❌ Erreur upsert token Supabase :", upsertError);
     } else {
-      console.log("✅ Token FCM vendeur enregistré dans Supabase");
+      console.log("✅ Token FCM vendeur enregistré/upserté dans Supabase");
     }
 
   } catch (err) {
