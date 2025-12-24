@@ -1,4 +1,3 @@
-import fetch from "node-fetch"; // si Node 18+, fetch est global
 import { supabase } from "./supabaseClient";
 
 /**
