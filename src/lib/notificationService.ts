@@ -1,31 +1,32 @@
 import { supabase } from "./supabaseClient";
 
-/**
- * Récupère tous les tokens FCM associés à un vendeur
- */
-export const getSellerFcmTokens = async (sellerId: string) => {
+// 🔹 Récupère tous les tokens FCM associés à un vendeur
+export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> => {
   const { data, error } = await supabase
     .from("user_tokens")
     .select("fcm_token")
     .eq("seller_id", sellerId);
 
   if (error) {
-    console.error("Erreur récupération tokens FCM du vendeur :", error);
+    console.error("Erreur en récupérant les tokens FCM du vendeur :", error);
     return [];
   }
 
-  return data?.map((item: any) => item.fcm_token) || [];
+  return data?.map((item) => item.fcm_token) || [];
 };
 
-/**
- * Envoie une notification à plusieurs tokens FCM
- */
-export const sendNotification = async (
-  tokens: string[],
+// 🔹 Envoie une notification à plusieurs tokens FCM
+export const sendFcmNotification = async (
+  sellerId: string,
   title: string,
   body: string
 ) => {
-  if (!tokens.length) return;
+  const tokens = await getSellerFcmTokens(sellerId);
+
+  if (!tokens.length) {
+    console.log("⚠️ Aucun token trouvé pour ce vendeur");
+    return;
+  }
 
   const message = {
     registration_ids: tokens,
@@ -40,7 +41,7 @@ export const sendNotification = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "BJlVg5_LEHb_7zkGLf2v5tRefZZ_WKzLz_0Az4U6qW_2HUWDqmF4ldpB9-8SvLJpFdLmUzSdk5i4NQmYna9xgNA"
+        "Authorization": "BJlVg5_LEHb_7zkGLf2v5tRefZZ_WKzLz_0Az4U6qW_2HUWDqmF4ldpB9-8SvLJpFdLmUzSdk5i4NQmYna9xgNA",
       },
       body: JSON.stringify(message),
     });
@@ -55,18 +56,6 @@ export const sendNotification = async (
 /**
  * Exemple : envoyer une notification quand une commande est passée
  */
-export const notifySeller = async (
-  sellerId: string,
-  orderId: string
-) => {
-  const tokens = await getSellerFcmTokens(sellerId);
-  if (!tokens.length) {
-    console.warn("Aucun token FCM pour ce vendeur");
-    return;
-  }
-
-  const title = "Nouvelle commande !";
-  const body = `Vous avez reçu une nouvelle commande (#${orderId})`;
-
-  await sendNotification(tokens, title, body);
+export const notifySeller = async (sellerId: string, orderId: string) => {
+  await sendFcmNotification(sellerId, "Nouvelle commande", "Vous avez une nouvelle commande !");
 };
