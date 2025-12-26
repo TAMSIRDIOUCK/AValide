@@ -1,7 +1,6 @@
 // src/utils/orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
-import { getSellerFcmTokens, sendNotificationToSeller } from '../lib/notificationService';
 import { v4 as uuidv4 } from 'uuid';
 
 //////////////////////////////////////////////////////////////
@@ -101,7 +100,6 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       return [];
     }
 
-    // Filtrer uniquement les items du vendeur
     const filteredOrders = (data || []).map((order: any) => ({
       ...order,
       order_items: (order.order_items || []).filter(
@@ -109,7 +107,6 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       ),
     }));
 
-    // Supprimer les commandes sans items
     const nonEmptyOrders = filteredOrders.filter(
       (order: any) => order.order_items.length > 0
     );
@@ -244,7 +241,7 @@ export async function updateOrderStatusIfAllItemsValidated(orderId: string): Pro
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Crée une commande et envoie la notification FCM automatiquement
+// 🔵 Crée une commande et déclenche la notification via API
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
@@ -285,37 +282,28 @@ export const createOrder = async (orderData: any): Promise<string> => {
       console.log(`✅ ${order_items.length} item(s) inséré(s) pour la commande`);
     }
 
-    // 3️⃣ Notifications FCM par vendeur
-    if (order_items && order_items.length > 0) {
-      const itemsBySeller: Record<string, typeof order_items> = order_items.reduce(
-        (acc: Record<string, typeof order_items>, item: any) => {
-          if (!acc[item.seller_id]) acc[item.seller_id] = [];
-          acc[item.seller_id].push(item);
-          return acc;
-        },
-        {}
-      );
+    // 3️⃣ Notifications FCM par vendeur via API Vercel
+if (order_items && order_items.length > 0) {
+  const sellers = Array.from(
+    new Set(order_items.map((item: any) => item.seller_id))
+  ) as string[]; // ✅ force le typage en string[]
 
-      await Promise.all(
-        Object.entries(itemsBySeller).map(async ([sellerId, items]) => {
-          try {
-            const tokens = await getSellerFcmTokens(sellerId);
-            if (tokens && tokens.length > 0) {
-              await sendNotificationToSeller(
-                sellerId,
-                "Nouvelle commande !",
-                `Vous avez reçu une nouvelle commande (${items.length} produit${items.length > 1 ? 's' : ''}).`
-              );
-              console.log(`✅ Notification envoyée au vendeur ${sellerId}`);
-            } else {
-              console.warn(`⚠️ Aucun token FCM pour le vendeur ${sellerId}, notification non envoyée`);
-            }
-          } catch (notifError) {
-            console.error(`❌ Erreur notification vendeur ${sellerId} :`, notifError);
-          }
-        })
-      );
-    }
+  await Promise.all(
+    sellers.map(async (sellerId: string) => {
+      try {
+        await fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sellerId }),
+        });
+        console.log(`✅ Notification demandée pour le vendeur ${sellerId}`);
+      } catch (err) {
+        console.error(`❌ Erreur appel API notification vendeur ${sellerId}`, err);
+      }
+    })
+  );
+}
+
 
     console.log('✅ Création commande terminée');
     return orderId;
