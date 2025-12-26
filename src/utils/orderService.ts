@@ -1,7 +1,6 @@
 // src/utils/orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
-import { v4 as uuidv4 } from 'uuid';
 
 //////////////////////////////////////////////////////////////
 // 🔁 Transforme une ligne Supabase en objet Order exploitable
@@ -100,6 +99,7 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       return [];
     }
 
+    // Filtre uniquement les items du vendeur
     const filteredOrders = (data || []).map((order: any) => ({
       ...order,
       order_items: (order.order_items || []).filter(
@@ -107,6 +107,7 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       ),
     }));
 
+    // Retire les commandes sans items
     const nonEmptyOrders = filteredOrders.filter(
       (order: any) => order.order_items.length > 0
     );
@@ -152,7 +153,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
       return [];
     }
 
-    const items = (data || []).map((item: any) => {
+    return (data || []).map((item: any) => {
       const variant = tryParseVariant(item.selected_variant);
       return {
         ...item,
@@ -162,9 +163,6 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
       };
     });
 
-    console.log(`✅ ${items.length} item(s) récupéré(s) pour le vendeur ${sellerId}`);
-    return items;
-
   } catch (err) {
     console.error('❌ Exception getOrderItemsBySeller :', err);
     return [];
@@ -172,7 +170,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// ✅ Marque un article comme validé et vérifie si tous les articles sont validés
+// ✅ Marque un article comme validé et met à jour la commande
 //////////////////////////////////////////////////////////////
 export async function markOrderItemAsValidated(itemId: string): Promise<void> {
   try {
@@ -181,10 +179,7 @@ export async function markOrderItemAsValidated(itemId: string): Promise<void> {
       .update({ status: 'validée' })
       .eq('id', itemId);
 
-    if (updateError) {
-      console.error('❌ Erreur mise à jour item validé :', updateError);
-      throw updateError;
-    }
+    if (updateError) throw updateError;
 
     const { data: itemData, error: fetchError } = await supabase
       .from('order_items')
@@ -192,10 +187,7 @@ export async function markOrderItemAsValidated(itemId: string): Promise<void> {
       .eq('id', itemId)
       .single();
 
-    if (fetchError || !itemData) {
-      console.error('❌ Impossible de récupérer order_id pour itemId', itemId, fetchError);
-      throw fetchError || new Error('order_id introuvable');
-    }
+    if (fetchError || !itemData) throw fetchError || new Error('order_id introuvable');
 
     await updateOrderStatusIfAllItemsValidated(itemData.order_id);
 
@@ -215,10 +207,7 @@ export async function updateOrderStatusIfAllItemsValidated(orderId: string): Pro
       .select('status')
       .eq('order_id', orderId);
 
-    if (error || !items) {
-      console.warn('⚠️ Impossible de récupérer les items pour orderId', orderId, error);
-      return;
-    }
+    if (error || !items) return;
 
     const allValidated = items.every(item => item.status === 'validée');
 
@@ -228,11 +217,8 @@ export async function updateOrderStatusIfAllItemsValidated(orderId: string): Pro
         .update({ status: 'validée' })
         .eq('id', orderId);
 
-      if (updateError) {
-        console.error('❌ Erreur mise à jour statut commande :', updateError);
-      } else {
-        console.log(`✅ Commande ${orderId} marquée validée (tous les items validés)`);
-      }
+      if (updateError) console.error('❌ Erreur mise à jour statut commande :', updateError);
+      else console.log(`✅ Commande ${orderId} marquée validée`);
     }
 
   } catch (err) {
@@ -247,24 +233,22 @@ export const createOrder = async (orderData: any): Promise<string> => {
   try {
     console.log('📌 Début création commande');
 
-    // 1️⃣ Enregistre la commande principale
     const { order_items, ...orderMain } = orderData;
+
+    // 1️⃣ Crée la commande principale
     const { data, error } = await supabase
       .from("orders")
       .insert(orderMain)
       .select();
 
-    if (error) {
-      console.error('❌ Erreur création commande :', error);
-      throw error;
-    }
+    if (error) throw error;
     if (!data || data.length === 0) throw new Error("Erreur création commande : data vide");
 
     const orderId = data[0].id;
     console.log('✅ Commande principale créée, orderId :', orderId);
 
     // 2️⃣ Insère les items
-    if (order_items && order_items.length > 0) {
+    if (order_items?.length) {
       const itemsToInsert = order_items.map((item: any) => ({
         ...item,
         order_id: orderId,
@@ -274,36 +258,29 @@ export const createOrder = async (orderData: any): Promise<string> => {
         .from("order_items")
         .insert(itemsToInsert);
 
-      if (itemsError) {
-        console.error('❌ Erreur insertion items :', itemsError);
-        throw itemsError;
-      }
-
-      console.log(`✅ ${order_items.length} item(s) inséré(s) pour la commande`);
+      if (itemsError) throw itemsError;
+      console.log(`✅ ${order_items.length} item(s) inséré(s)`);
     }
 
-    // 3️⃣ Notifications FCM par vendeur via API Vercel
-if (order_items && order_items.length > 0) {
-  const sellers = Array.from(
-    new Set(order_items.map((item: any) => item.seller_id))
-  ) as string[]; // ✅ force le typage en string[]
+    // 3️⃣ Notifications FCM par vendeur via API (sans session)
+    if (order_items?.length) {
+      const sellers = Array.from(new Set(order_items.map((i: any) => i.seller_id))) as string[];
 
-  await Promise.all(
-    sellers.map(async (sellerId: string) => {
-      try {
-        await fetch("/api/send-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sellerId }),
-        });
-        console.log(`✅ Notification demandée pour le vendeur ${sellerId}`);
-      } catch (err) {
-        console.error(`❌ Erreur appel API notification vendeur ${sellerId}`, err);
-      }
-    })
-  );
-}
-
+      await Promise.all(
+        sellers.map(async (sellerId: string) => {
+          try {
+            await fetch("/api/send-notification", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sellerId }),
+            });
+            console.log(`✅ Notification demandée pour le vendeur ${sellerId}`);
+          } catch (err) {
+            console.error(`❌ Erreur notification vendeur ${sellerId}`, err);
+          }
+        })
+      );
+    }
 
     console.log('✅ Création commande terminée');
     return orderId;
