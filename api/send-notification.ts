@@ -1,9 +1,8 @@
-// src/api/send-notification.ts
 import admin from "firebase-admin";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-// 🔹 Initialisation Firebase Admin (clé privée depuis les variables d'environnement)
+/// 🔹 Initialisation Firebase Admin (clé privée depuis les variables d'environnement)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -22,50 +21,45 @@ const supabase = createClient(
 );
 
 // 🔹 API Handler
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // On peut recevoir un sellerId spécifique ou envoyer à tous les vendeurs
     const { sellerId } = req.body;
 
-    // 🔹 Récupération des tokens FCM depuis Supabase
     let query = supabase.from("user_tokens").select("fcm_token");
     if (sellerId) {
       query = query.eq("seller_id", sellerId);
     }
+
     const { data, error } = await query;
 
     if (error) {
-      console.error("Erreur Supabase:", error.message);
+      console.error("❌ Supabase error:", error);
       return res.status(500).json({ error: "Erreur récupération tokens" });
     }
 
-    const tokens = data?.map((t) => t.fcm_token) || [];
+    const tokens = data?.map(t => t.fcm_token).filter(Boolean);
 
-    if (!tokens.length) {
-      return res.status(200).json({ message: "Aucun token disponible" });
+    if (!tokens || tokens.length === 0) {
+      return res.status(200).json({ message: "Aucun token FCM" });
     }
 
-    // 🔹 Envoi de la notification FCM
-    const message = {
+    // ✅ DATA ONLY (OBLIGATOIRE)
+    const response = await admin.messaging().sendEachForMulticast({
       tokens,
-      notification: {
-        title: "Nouvelle commande",
-        body: "Vous avez reçu une nouvelle commande",
+      data: {
+        title: "🛒 Nouvelle commande",
+        body: "Un client vient de passer une commande",
       },
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
+    });
 
     return res.status(200).json({
       success: true,
-      message: "Notification envoyée",
-      response,
+      sent: response.successCount,
+      failed: response.failureCount,
     });
+
   } catch (err) {
-    console.error("Erreur API notification:", err);
+    console.error("❌ Notification error:", err);
     return res.status(500).json({ error: "Erreur serveur" });
   }
 }
