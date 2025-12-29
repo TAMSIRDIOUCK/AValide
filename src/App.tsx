@@ -3,8 +3,9 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
-import { supabase } from './lib/supabaseClient';
+import { listenForegroundNotifications } from "./lib/firebase";
 
+// --- Components & Pages ---
 import Header from './components/layout/Header';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -55,8 +56,13 @@ const App: React.FC = () => {
       // 1️⃣ Enregistrer le service worker
       await registerServiceWorker();
 
-      // 2️⃣ Demander la permission et enregistrer le token du vendeur
+      // 2️⃣ Demander la permission et enregistrer le token
       await requestNotificationPermission();
+
+      // 3️⃣ Écoute des notifications en premier plan
+      if ("Notification" in window && Notification.permission === "granted") {
+        listenForegroundNotifications();
+      }
     };
 
     initFirebase();
