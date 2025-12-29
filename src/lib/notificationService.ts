@@ -6,9 +6,9 @@ import { supabase } from "./supabaseClient";
 export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> => {
   try {
     const { data, error } = await supabase
-      .from("user_tokens")
-      .select("fcm_token")
-      .eq("seller_id", sellerId);
+      .from("jetons_utilisateur")  // nom de ta table actuelle
+      .select("jeton_fcm")         // nom exact de la colonne token
+      .eq("identifiant_vendeur", sellerId); // id du vendeur
 
     if (error) {
       console.error("❌ Erreur lors de la récupération des tokens FCM :", error);
@@ -20,7 +20,7 @@ export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> =>
       return [];
     }
 
-    const tokens = data.map((item) => item.fcm_token);
+    const tokens = data.map((item) => item.jeton_fcm);
     console.log(`✅ ${tokens.length} token(s) FCM récupéré(s) pour le vendeur ${sellerId}`);
     return tokens;
 
@@ -62,7 +62,7 @@ export const sendNotificationToSeller = async (
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization":"BJlVg5_LEHb_7zkGLf2v5tRefZZ_WKzLz_0Az4U6qW_2HUWDqmF4ldpB9-8SvLJpFdLmUzSdk5i4NQmYna9xgNA"
+          "Authorization": "BJlVg5_LEHb_7zkGLf2v5tRefZZ_WKzLz_0Az4U6qW_2HUWDqmF4ldpB9-8SvLJpFdLmUzSdk5i4NQmYna9xgNA"
         },
         body: JSON.stringify(message),
       });
