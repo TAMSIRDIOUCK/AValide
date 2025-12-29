@@ -6,9 +6,9 @@ import { supabase } from "./supabaseClient";
 export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> => {
   try {
     const { data, error } = await supabase
-      .from("jetons_utilisateur")  // nom de ta table actuelle
-      .select("jeton_fcm")         // nom exact de la colonne token
-      .eq("identifiant_vendeur", sellerId); // id du vendeur
+      .from("user_tokens")      // table correcte
+      .select("fcm_token")      // colonne correcte
+      .eq("seller_id", sellerId); // id vendeur
 
     if (error) {
       console.error("❌ Erreur lors de la récupération des tokens FCM :", error);
@@ -20,7 +20,7 @@ export const getSellerFcmTokens = async (sellerId: string): Promise<string[]> =>
       return [];
     }
 
-    const tokens = data.map((item) => item.jeton_fcm);
+    const tokens = data.map((item) => item.fcm_token);
     console.log(`✅ ${tokens.length} token(s) FCM récupéré(s) pour le vendeur ${sellerId}`);
     return tokens;
 
@@ -67,7 +67,6 @@ export const sendNotificationToSeller = async (
         body: JSON.stringify(message),
       });
 
-      // 4️⃣ Vérifier la réponse
       const data = await response.json();
       if (!response.ok) {
         console.error("❌ Erreur HTTP FCM :", response.status, data);
