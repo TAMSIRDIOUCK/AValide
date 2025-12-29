@@ -1,8 +1,6 @@
-// src/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getMessaging, onMessage } from "firebase/messaging";
+import { getMessaging, onMessage, getToken } from "firebase/messaging";
 
-// Configuration Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyBNM88NZV3Rxsj-rp25zB1QWfwTSO0_KnQ",
   authDomain: "avalide-push.firebaseapp.com",
@@ -11,35 +9,35 @@ const firebaseConfig = {
   appId: "1:1027830005942:web:adb58cde5396468f33e617",
 };
 
-// Initialisation Firebase
 const app = initializeApp(firebaseConfig);
-
-// Récupération de Messaging
 const messaging = getMessaging(app);
 
-/**
- * Écoute les notifications en premier plan
- * Affiche les notifications jolies avec le logo AValide
- */
+// Récupérer le token et l’envoyer au serveur
+export const getFcmToken = async () => {
+  try {
+    const token = await getToken(messaging, {
+      vapidKey: "TON_VAPID_KEY_ICI",
+    });
+    console.log("🔹 Token FCM :", token);
+    return token;
+  } catch (err) {
+    console.error("❌ Erreur getToken FCM :", err);
+    return null;
+  }
+};
+
+// Notifications en premier plan
 export const listenForegroundNotifications = () => {
   onMessage(messaging, (payload) => {
-    console.log("🔔 Notification reçue au premier plan :", payload);
-
     const title = payload.notification?.title || "Nouvelle commande AValide";
     const options = {
       body: payload.notification?.body || "Vous avez une nouvelle commande",
-      icon: "/IMG_1696.jpg",   // logo AValide
-      badge: "/IMG_1696.jpg",  // badge
-      data: {
-        url: "/orders",            // redirection vers MyOrdersPage
-        ...payload.data,
-      },
+      icon: "/videos/IMG_1696.jpg",
+      badge: "//videos/IMG_1696.jpg",
+      data: { url: "/orders" },
     };
 
-    // Notification via API du navigateur
     const notification = new Notification(title, options);
-
-    // Redirection si clic sur la notification
     notification.onclick = () => {
       window.focus();
       window.location.href = options.data.url;

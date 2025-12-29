@@ -1,32 +1,32 @@
 // src/App.tsx
-import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+import React, { useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
 import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
-import { listenForegroundNotifications } from "./lib/firebase";
+import { getFcmToken, listenForegroundNotifications } from "./lib/firebase";
 
 // --- Components & Pages ---
-import Header from './components/layout/Header';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import CartPage from './pages/CartPage';
-import CheckoutPage from './pages/CheckoutPage';
-import OrderSuccessPage from './pages/OrderSuccessPage';
-import SellerDashboardPage from './pages/seller/SellerDashboardPage';
-import AddProductPage from './pages/seller/AddProductPage';
-import EditProductPage from './pages/seller/EditProductPage';
-import CategoryPage from './pages/categories/CategoryPage';
-import SearchResultsPage from './pages/categories/SearchResultsPage';
-import MyOrdersPage from './pages/account/MyOrdersPage';
-import FaqPage from './pages/FaqPage';
-import ShippingPage from './pages/ShippingPage';
-import ReturnsPage from './pages/ReturnsPage';
-import TermsPage from './pages/TermsPage';
-import PrivacyPage from './pages/PrivacyPage';
-import AddServicePage from './pages/seller/AddServicePage';
-import ServiceDetailPage from './pages/services/ServiceDetailPage';
-import ProductDetailPageWrapper from './pages/products/ProductDetailPageWrapper';
+import Header from "./components/layout/Header";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import CartPage from "./pages/CartPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import OrderSuccessPage from "./pages/OrderSuccessPage";
+import SellerDashboardPage from "./pages/seller/SellerDashboardPage";
+import AddProductPage from "./pages/seller/AddProductPage";
+import EditProductPage from "./pages/seller/EditProductPage";
+import CategoryPage from "./pages/categories/CategoryPage";
+import SearchResultsPage from "./pages/categories/SearchResultsPage";
+import MyOrdersPage from "./pages/account/MyOrdersPage";
+import FaqPage from "./pages/FaqPage";
+import ShippingPage from "./pages/ShippingPage";
+import ReturnsPage from "./pages/ReturnsPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import AddServicePage from "./pages/seller/AddServicePage";
+import ServiceDetailPage from "./pages/services/ServiceDetailPage";
+import ProductDetailPageWrapper from "./pages/products/ProductDetailPageWrapper";
 
 // --- Composant route protégée ---
 interface ProtectedRouteProps {
@@ -48,18 +48,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
+// --- Composant principal App ---
 const App: React.FC = () => {
-  const { user } = useAuth(); // récupère l’utilisateur connecté
+  const { user } = useAuth();
 
   useEffect(() => {
     const initFirebase = async () => {
-      // 1️⃣ Enregistrer le service worker
+      // 1️⃣ Enregistrer le service worker (arrière-plan)
       await registerServiceWorker();
 
-      // 2️⃣ Demander la permission et enregistrer le token
+      // 2️⃣ Demander la permission et récupérer le token
       await requestNotificationPermission();
+      const token = await getFcmToken();
+      if (token) {
+        // 🔹 Envoyer ce token au serveur Supabase
+        console.log("Envoyer ce token au serveur :", token);
+      }
 
-      // 3️⃣ Écoute des notifications en premier plan
+      // 3️⃣ Écoute notifications en premier plan
       if ("Notification" in window && Notification.permission === "granted") {
         listenForegroundNotifications();
       }
