@@ -1,8 +1,7 @@
+// src/utils/orderService.ts
 import { supabase } from "../lib/supabaseClient";
 import { Order } from "../types/types";
-// src/utils/orderService.ts
-// src/utils/orderService.ts
-import { sendOrderEmail } from "../lib/sendEmail"; // <-- accolades obligatoires
+import { sendOrderEmail } from "../lib/sendEmail";
 import { sendOrderSms } from "../lib/sendSms";
 
 //////////////////////////////////////////////////////////////
@@ -15,6 +14,7 @@ function tryParseVariant(v: any) {
     try {
       return JSON.parse(v);
     } catch {
+      console.error("Impossible de parser selected_variant:", v);
       return {};
     }
   }
@@ -90,7 +90,11 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
     `)
     .order("created_at", { ascending: false });
 
-  if (error || !data) return [];
+  if (error) {
+    console.error("Erreur getOrdersBySeller:", error);
+    return [];
+  }
+  if (!data) return [];
 
   const filtered = data
     .map((order: any) => ({
@@ -114,7 +118,11 @@ export async function getOrderItemsBySeller(sellerId: string) {
     .eq("seller_id", sellerId)
     .order("created_at", { ascending: false });
 
-  if (error || !data) return [];
+  if (error) {
+    console.error("Erreur getOrderItemsBySeller:", error);
+    return [];
+  }
+  if (!data) return [];
 
   return data.map((item: any) => {
     const variant = tryParseVariant(item.selected_variant);
@@ -131,10 +139,15 @@ export async function getOrderItemsBySeller(sellerId: string) {
 // ✅ Valider un item
 //////////////////////////////////////////////////////////////
 export async function markOrderItemAsValidated(itemId: string) {
-  await supabase
+  const { error } = await supabase
     .from("order_items")
     .update({ status: "validée" })
     .eq("id", itemId);
+
+  if (error) {
+    console.error("Erreur markOrderItemAsValidated:", error);
+    return;
+  }
 
   const { data } = await supabase
     .from("order_items")
@@ -151,11 +164,15 @@ export async function markOrderItemAsValidated(itemId: string) {
 // ✅ Met à jour le statut global de la commande
 //////////////////////////////////////////////////////////////
 export async function updateOrderStatusIfAllItemsValidated(orderId: string) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("order_items")
     .select("status")
     .eq("order_id", orderId);
 
+  if (error) {
+    console.error("Erreur updateOrderStatusIfAllItemsValidated:", error);
+    return;
+  }
   if (!data) return;
 
   const allValidated = data.every((item) => item.status === "validée");
@@ -169,7 +186,7 @@ export async function updateOrderStatusIfAllItemsValidated(orderId: string) {
 }
 
 //////////////////////////////////////////////////////////////
-// 📢 Notification vendeur (EMAIL + SMS)
+// 📢 Notification vendeur (EMAIL + SMS) avec logs d'erreurs
 //////////////////////////////////////////////////////////////
 async function notifySeller({
   sellerEmail,
@@ -180,14 +197,35 @@ async function notifySeller({
   sellerPhone?: string;
   orderId: string;
 }) {
-  if (sellerEmail) await sendOrderEmail(sellerEmail, orderId);
-  if (sellerPhone) await sendOrderSms(sellerPhone, orderId);
+  if (sellerEmail) {
+    try {
+      await sendOrderEmail(sellerEmail, orderId);
+      console.log("✅ Email envoyé à", sellerEmail);
+    } catch (err) {
+      console.error("❌ Impossible d'envoyer l'email à", sellerEmail, err);
+    }
+  }
+
+  if (sellerPhone) {
+    try {
+      await sendOrderSms(sellerPhone, orderId);
+      console.log("✅ SMS envoyé à", sellerPhone);
+    } catch (err) {
+      console.error("❌ Impossible d'envoyer le SMS à", sellerPhone, err);
+    }
+  }
 }
 
 //////////////////////////////////////////////////////////////
 // 🟢 CRÉATION DE COMMANDE (POINT CENTRAL)
 //////////////////////////////////////////////////////////////
-export const createOrder = async (orderData: any): Promise<string> => {
+export const createOrder = async (orderData: any): Promise<{
+  success: boolean;
+  orderId?: string;
+  notifications?: string[];
+  message?: string;
+}> => {
+  const notifications: string[] = [];
   const { order_items, ...orderMain } = orderData;
 
   // 1️⃣ Créer la commande principale
@@ -197,7 +235,10 @@ export const createOrder = async (orderData: any): Promise<string> => {
     .select()
     .single();
 
-  if (error || !data) throw new Error("Erreur création commande");
+  if (error || !data) {
+    console.error("Erreur création commande:", error);
+    return { success: false, message: "Erreur création commande" };
+  }
 
   const orderId = data.id;
 
@@ -208,11 +249,14 @@ export const createOrder = async (orderData: any): Promise<string> => {
       order_id: orderId,
     }));
 
-    await supabase.from("order_items").insert(items);
+    const { error: itemsError } = await supabase.from("order_items").insert(items);
+    if (itemsError) {
+      console.error("Erreur création items:", itemsError);
+      return { success: false, message: "Erreur création des items" };
+    }
 
     // 3️⃣ Notifier chaque vendeur
     const sellers = new Map<string, { email?: string; phone?: string }>();
-
     items.forEach((item: any) => {
       if (!sellers.has(item.seller_id)) {
         sellers.set(item.seller_id, {
@@ -223,15 +267,16 @@ export const createOrder = async (orderData: any): Promise<string> => {
     });
 
     await Promise.all(
-      Array.from(sellers.values()).map((seller) =>
-        notifySeller({
-          sellerEmail: seller.email,
-          sellerPhone: seller.phone,
-          orderId,
-        })
-      )
+      Array.from(sellers.values()).map(async (seller) => {
+        try {
+          await notifySeller({ sellerEmail: seller.email, sellerPhone: seller.phone, orderId });
+          notifications.push(`Notifications envoyées à ${seller.email || seller.phone}`);
+        } catch (err) {
+          notifications.push(`Erreur notification pour ${seller.email || seller.phone}`);
+        }
+      })
     );
   }
 
-  return orderId;
+  return { success: true, orderId, notifications };
 };
