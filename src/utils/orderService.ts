@@ -1,8 +1,23 @@
-// src/utils/orderService.ts
 import { supabase } from "../lib/supabaseClient";
 import { Order } from "../types/types";
 import { sendOrderEmail } from "../lib/sendEmail";
 import { sendOrderSms } from "../lib/sendSms";
+
+//////////////////////////////////////////////////////////////
+// 🔎 Parse TEXT → JSON en toute sécurité
+//////////////////////////////////////////////////////////////
+function tryParseVariant(v: any) {
+  if (!v) return {};
+  if (typeof v === "object") return v;
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v);
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
 //////////////////////////////////////////////////////////////
 // 🔁 Transforme une ligne Supabase en objet Order exploitable
@@ -40,27 +55,9 @@ function mapOrderFields(order: any): Order {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔎 Parse TEXT → JSON en toute sécurité
+// 🟢 Récupère toutes les commandes pour un vendeur
 //////////////////////////////////////////////////////////////
-function tryParseVariant(v: any) {
-  if (!v) return {};
-  if (typeof v === "object") return v;
-  if (typeof v === "string") {
-    try {
-      return JSON.parse(v);
-    } catch {
-      return {};
-    }
-  }
-  return {};
-}
-
-//////////////////////////////////////////////////////////////
-// 🟢 Récupère toutes les commandes du vendeur
-//////////////////////////////////////////////////////////////
-export async function getOrdersBySeller(
-  sellerId: string
-): Promise<Order[]> {
+export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(`
@@ -106,7 +103,7 @@ export async function getOrdersBySeller(
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Récupère les items du vendeur (dashboard)
+// 🔵 Récupère tous les items pour un vendeur (dashboard)
 //////////////////////////////////////////////////////////////
 export async function getOrderItemsBySeller(sellerId: string) {
   const { data, error } = await supabase
@@ -151,9 +148,7 @@ export async function markOrderItemAsValidated(itemId: string) {
 //////////////////////////////////////////////////////////////
 // ✅ Met à jour le statut global de la commande
 //////////////////////////////////////////////////////////////
-export async function updateOrderStatusIfAllItemsValidated(
-  orderId: string
-) {
+export async function updateOrderStatusIfAllItemsValidated(orderId: string) {
   const { data } = await supabase
     .from("order_items")
     .select("status")
@@ -161,9 +156,7 @@ export async function updateOrderStatusIfAllItemsValidated(
 
   if (!data) return;
 
-  const allValidated = data.every(
-    (item) => item.status === "validée"
-  );
+  const allValidated = data.every((item) => item.status === "validée");
 
   if (allValidated) {
     await supabase
@@ -185,33 +178,24 @@ async function notifySeller({
   sellerPhone?: string;
   orderId: string;
 }) {
-  if (sellerEmail) {
-    await sendOrderEmail(sellerEmail, orderId);
-  }
-
-  if (sellerPhone) {
-    await sendOrderSms(sellerPhone, orderId);
-  }
+  if (sellerEmail) await sendOrderEmail(sellerEmail, orderId);
+  if (sellerPhone) await sendOrderSms(sellerPhone, orderId);
 }
 
 //////////////////////////////////////////////////////////////
 // 🟢 CRÉATION DE COMMANDE (POINT CENTRAL)
 //////////////////////////////////////////////////////////////
-export const createOrder = async (
-  orderData: any
-): Promise<string> => {
+export const createOrder = async (orderData: any): Promise<string> => {
   const { order_items, ...orderMain } = orderData;
 
-  // 1️⃣ Créer la commande
+  // 1️⃣ Créer la commande principale
   const { data, error } = await supabase
     .from("orders")
     .insert(orderMain)
     .select()
     .single();
 
-  if (error || !data) {
-    throw new Error("Erreur création commande");
-  }
+  if (error || !data) throw new Error("Erreur création commande");
 
   const orderId = data.id;
 
@@ -225,10 +209,7 @@ export const createOrder = async (
     await supabase.from("order_items").insert(items);
 
     // 3️⃣ Notifier chaque vendeur
-    const sellers = new Map<
-      string,
-      { email?: string; phone?: string }
-    >();
+    const sellers = new Map<string, { email?: string; phone?: string }>();
 
     items.forEach((item: any) => {
       if (!sellers.has(item.seller_id)) {
