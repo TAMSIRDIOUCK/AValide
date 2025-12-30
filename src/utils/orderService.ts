@@ -1,6 +1,8 @@
 import { supabase } from "../lib/supabaseClient";
 import { Order } from "../types/types";
-import { sendOrderEmail } from "../lib/sendEmail";
+// src/utils/orderService.ts
+// src/utils/orderService.ts
+import { sendOrderEmail } from "../lib/sendEmail"; // <-- accolades obligatoires
 import { sendOrderSms } from "../lib/sendSms";
 
 //////////////////////////////////////////////////////////////

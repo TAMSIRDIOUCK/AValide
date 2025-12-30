@@ -1,32 +1,20 @@
-import nodemailer from "nodemailer";
+// src/lib/sendEmail.ts
+/**
+ * Wrapper pour appeler l'API /api/send-email
+ * côté frontend ou SSR.
+ */
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: "sirdiouck101@gmail.com",   // ex: avalide.notify@gmail.com
-    pass: "nabr nibu nngt lbjn", // mot de passe d’application Gmail
-  },
-});
-
-export async function sendOrderEmail(
-  toEmail: string,
-  orderId: string
-) {
-  await transporter.sendMail({
-    from: '"AValide" <avalide.notify@gmail.com>',
-    to: toEmail,
-    subject: "🛒 Nouvelle commande reçue",
-    html: `
-      <div style="font-family:Arial">
-        <img src="https://a-valide.com/logo-avalide.png" width="120" />
-        <h2>Nouvelle commande 🎉</h2>
-        <p>Commande <strong>#${orderId}</strong> reçue.</p>
-        <a href="https://a-valide.com/orders"
-           style="background:#ff6600;color:#fff;padding:10px 15px;
-                  text-decoration:none;border-radius:5px;">
-          Voir la commande
-        </a>
-      </div>
-    `,
-  });
-}
+// src/lib/sendEmail.ts
+export async function sendOrderEmail(toEmail: string, orderId: string) {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toEmail, orderId }),
+    });
+  
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Erreur lors de l'envoi de l'email");
+    }
+  }
+  
