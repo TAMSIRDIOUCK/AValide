@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, User, Menu, X, Search, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useCart } from '../../context/CartContext';
-import { supabase } from '../../lib/supabaseClient';
+import { useAuth } from '../../../context/AuthContext';
+import { useCart } from '../../../context/CartContext';
+import { supabase } from '../../../lib/supabaseClient';
 
 const Header: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);

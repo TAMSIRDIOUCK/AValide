@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getAllProductsFromSupabase } from '../../utils/productService';
 import { Product } from '../../types/types';
-import Layout from '../../components/layout/Layout';
+import Layout from '../../app/api/layout/Layout';
 import { useCart } from '../../context/CartContext';
 import { Heart, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';

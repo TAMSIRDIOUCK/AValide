@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Package, Upload, X } from 'lucide-react';
 
-import Layout from '../../components/layout/Layout';
+import Layout from '../../app/api/layout/Layout';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { uploadProductImages } from '../../lib/productImage';
