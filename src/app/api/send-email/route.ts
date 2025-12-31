@@ -1,28 +1,37 @@
 // src/app/api/send-email/route.ts
 import { NextResponse } from "next/server";
 
+// Ici tu mets ta logique réelle d'envoi d'email (SMTP, Nodemailer, etc.)
+async function sendEmail(toEmail: string, orderId: string) {
+  try {
+    // Exemple : console.log pour tester
+    console.log(`Email envoyé à ${toEmail} pour la commande #${orderId}`);
+    // Remplace par ton code SMTP ou API Email
+  } catch (err) {
+    console.error("Erreur envoi email :", err);
+    throw err;
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const { email, subject, message } = await req.json();
+    const body = await req.json();
+    const { toEmail, orderId } = body;
 
-    if (!email || !message) {
+    if (!toEmail || !orderId) {
       return NextResponse.json(
-        { success: false, error: "email et message obligatoires" },
+        { success: false, message: "toEmail et orderId sont requis" },
         { status: 400 }
       );
     }
 
-    console.log("📧 Email à envoyer :", email, subject, message);
+    await sendEmail(toEmail, orderId);
 
-    return NextResponse.json({
-      success: true,
-      message: "Email envoyé (simulation)",
-    });
-
-  } catch (err) {
-    console.error("❌ Erreur Email :", err);
+    return NextResponse.json({ success: true, message: "Email envoyé !" });
+  } catch (error) {
+    console.error("Erreur API send-email:", error);
     return NextResponse.json(
-      { success: false, error: "Erreur serveur Email" },
+      { success: false, message: "Erreur serveur" },
       { status: 500 }
     );
   }
