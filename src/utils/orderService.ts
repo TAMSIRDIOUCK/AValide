@@ -99,7 +99,6 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       return [];
     }
 
-    // Filtre uniquement les items du vendeur
     const filteredOrders = (data || []).map((order: any) => ({
       ...order,
       order_items: (order.order_items || []).filter(
@@ -107,14 +106,11 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       ),
     }));
 
-    // Retire les commandes sans items
     const nonEmptyOrders = filteredOrders.filter(
       (order: any) => order.order_items.length > 0
     );
 
-    const mappedOrders = nonEmptyOrders.map(mapOrderFields);
-    console.log(`✅ ${mappedOrders.length} commande(s) récupérée(s) pour le vendeur ${sellerId}`);
-    return mappedOrders;
+    return nonEmptyOrders.map(mapOrderFields);
 
   } catch (err) {
     console.error('❌ Exception getOrdersBySeller :', err);
@@ -187,7 +183,7 @@ export async function markOrderItemAsValidated(itemId: string): Promise<void> {
       .eq('id', itemId)
       .single();
 
-    if (fetchError || !itemData) throw fetchError || new Error('order_id introuvable');
+    if (fetchError || !itemData) throw fetchError;
 
     await updateOrderStatusIfAllItemsValidated(itemData.order_id);
 
@@ -198,27 +194,19 @@ export async function markOrderItemAsValidated(itemId: string): Promise<void> {
 }
 
 //////////////////////////////////////////////////////////////
-// ✅ Met à jour le statut global d'une commande si tous ses items sont validés
+// ✅ Met à jour le statut global d'une commande
 //////////////////////////////////////////////////////////////
 export async function updateOrderStatusIfAllItemsValidated(orderId: string): Promise<void> {
   try {
-    const { data: items, error } = await supabase
+    const { data: items } = await supabase
       .from('order_items')
       .select('status')
       .eq('order_id', orderId);
 
-    if (error || !items) return;
+    if (!items) return;
 
-    const allValidated = items.every(item => item.status === 'validée');
-
-    if (allValidated) {
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'validée' })
-        .eq('id', orderId);
-
-      if (updateError) console.error('❌ Erreur mise à jour statut commande :', updateError);
-      else console.log(`✅ Commande ${orderId} marquée validée`);
+    if (items.every(item => item.status === 'validée')) {
+      await supabase.from('orders').update({ status: 'validée' }).eq('id', orderId);
     }
 
   } catch (err) {
@@ -227,62 +215,71 @@ export async function updateOrderStatusIfAllItemsValidated(orderId: string): Pro
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Crée une commande et déclenche la notification via API
+// 🔵 Création commande + PUSH + SMS + EMAIL
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
-    console.log('📌 Début création commande');
-
     const { order_items, ...orderMain } = orderData;
 
-    // 1️⃣ Crée la commande principale
+    // 1️⃣ Création commande
     const { data, error } = await supabase
-      .from("orders")
+      .from('orders')
       .insert(orderMain)
       .select();
 
-    if (error) throw error;
-    if (!data || data.length === 0) throw new Error("Erreur création commande : data vide");
+    if (error || !data?.length) throw error;
 
     const orderId = data[0].id;
-    console.log('✅ Commande principale créée, orderId :', orderId);
 
-    // 2️⃣ Insère les items
+    // 2️⃣ Items
     if (order_items?.length) {
-      const itemsToInsert = order_items.map((item: any) => ({
-        ...item,
-        order_id: orderId,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(itemsToInsert);
-
-      if (itemsError) throw itemsError;
-      console.log(`✅ ${order_items.length} item(s) inséré(s)`);
-    }
-
-    // 3️⃣ Notifications FCM par vendeur via API (sans session)
-    if (order_items?.length) {
-      const sellers = Array.from(new Set(order_items.map((i: any) => i.seller_id))) as string[];
-
-      await Promise.all(
-        sellers.map(async (sellerId: string) => {
-          try {
-            await fetch("/api/send-notification", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sellerId }),
-            });
-            console.log(`✅ Notification demandée pour le vendeur ${sellerId}`);
-          } catch (err) {
-            console.error(`❌ Erreur notification vendeur ${sellerId}`, err);
-          }
-        })
+      await supabase.from('order_items').insert(
+        order_items.map((item: any) => ({ ...item, order_id: orderId }))
       );
     }
 
-    console.log('✅ Création commande terminée');
+    // 3️⃣ PUSH (NE PAS MODIFIER)
+    if (order_items?.length) {
+      const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
+
+      await Promise.all(
+        sellers.map(sellerId =>
+          fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sellerId }),
+          })
+        )
+      );
+    }
+
+    // 4️⃣ SMS CLIENT
+    await fetch('/api/send-sms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: orderMain.customer_phone,
+        message: `Votre commande AValide (#${orderId}) a bien été reçue. Merci pour votre confiance.`,
+      }),
+    });
+
+    // 5️⃣ EMAIL CLIENT (si email présent)
+    if (orderMain.customer_email) {
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: orderMain.customer_email,
+          subject: 'Confirmation de commande AValide',
+          html: `
+            <h3>Merci pour votre commande</h3>
+            <p>Numéro : <strong>${orderId}</strong></p>
+            <p>Total : ${orderMain.total} FCFA</p>
+          `,
+        }),
+      });
+    }
+
     return orderId;
 
   } catch (err) {
