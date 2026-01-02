@@ -6,7 +6,7 @@ import { registerServiceWorker, requestNotificationPermission } from "./lib/fire
 import { getFcmToken, listenForegroundNotifications } from "./lib/firebase";
 
 // --- Components & Pages ---
-import Header from "./app/api/layout/Header";
+import Header from "./components/layout/Header";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";

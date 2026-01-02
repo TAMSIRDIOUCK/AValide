@@ -1,7 +1,7 @@
 // src/pages/OrderSuccessPage.tsx
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import Layout from '../app/api/layout/Layout';
+import Layout from '../components/layout/Layout';
 import { CheckCircle, ShoppingBag, Home } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 

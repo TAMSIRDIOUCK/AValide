@@ -253,32 +253,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
       );
     }
 
-    // 4️⃣ SMS CLIENT
-    await fetch('/api/send-sms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: orderMain.customer_phone,
-        message: `Votre commande AValide (#${orderId}) a bien été reçue. Merci pour votre confiance.`,
-      }),
-    });
-
-    // 5️⃣ EMAIL CLIENT (si email présent)
-    if (orderMain.customer_email) {
-      await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: orderMain.customer_email,
-          subject: 'Confirmation de commande AValide',
-          html: `
-            <h3>Merci pour votre commande</h3>
-            <p>Numéro : <strong>${orderId}</strong></p>
-            <p>Total : ${orderMain.total} FCFA</p>
-          `,
-        }),
-      });
-    }
+   
 
     return orderId;
 

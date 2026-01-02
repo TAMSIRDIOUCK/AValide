@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import Layout from '../app/api/layout/Layout';
+import Layout from '../components/layout/Layout';
 import RegisterForm from '../components/auth/RegisterForm';
 import { useAuth } from '../context/AuthContext';
 

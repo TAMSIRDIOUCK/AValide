@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Layout from '../../app/api/layout/Layout';
+import Layout from '../../components/layout/Layout';
 import {
   Package, Plus, Edit, Trash2, AlertCircle, MessageSquare, Briefcase
 } from 'lucide-react';

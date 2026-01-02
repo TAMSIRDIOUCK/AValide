@@ -1,7 +1,7 @@
 // src/pages/CartPage.tsx
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import Layout from '../app/api/layout/Layout';
+import Layout from '../components/layout/Layout';
 import CartItem from '../components/cart/CartItem';
 import ProductCard from '../components/products/ProductCard';
 import { useCart, CartItem as CartContextItem } from '../context/CartContext';

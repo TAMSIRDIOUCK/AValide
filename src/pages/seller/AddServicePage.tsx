@@ -1,7 +1,7 @@
 // src/pages/seller/AddServicePage.tsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Layout from "../../app/api/layout/Layout";
+import Layout from "../../components/layout/Layout";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
 import { Plus, X } from "lucide-react";

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Layout from '../../app/api/layout/Layout';
+import Layout from '../../components/layout/Layout';
 import { useDropzone } from 'react-dropzone';
 import { categories } from '../../data/categories';
 import { mockProducts } from '../../data/mockProducts';

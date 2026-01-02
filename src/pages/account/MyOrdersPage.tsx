@@ -1,6 +1,6 @@
 // src/pages/account/MyOrdersPage.tsx
 import React, { useEffect, useState } from 'react';
-import Layout from '../../app/api/layout/Layout';
+import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { getOrderItemsBySeller } from '../../utils/orderService';
 import { supabase } from '../../lib/supabaseClient';
