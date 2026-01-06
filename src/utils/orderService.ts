@@ -170,18 +170,22 @@ export const createOrder = async (orderData: any): Promise<string> => {
     //////////////////////////////////////////////////////////////
     // 3️⃣ NOTIFICATION VENDEURS (PUSH + SMS TOUJOURS)
     //////////////////////////////////////////////////////////////
-    const sellers: string[] = [
-      ...new Set(order_items.map((i: any) => i.seller_id)),
-    ] as string[];
+    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
+
 
     for (const sellerId of sellers) {
+      console.log("➡️ Notification vendeur pour sellerId :", sellerId);
+
       // 🔹 PUSH (si token existe)
       const { data: tokens } = await supabase
         .from('user_tokens')
         .select('fcm_token')
         .eq('seller_id', sellerId);
 
+      console.log("   Tokens FCM trouvés :", tokens);
+
       if (tokens && tokens.length > 0) {
+        console.log("   Envoi PUSH au vendeur...");
         await fetch('/api/send-notification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -195,6 +199,8 @@ export const createOrder = async (orderData: any): Promise<string> => {
         .select('phone')
         .eq('id', sellerId)
         .single();
+
+      console.log("   Numéro vendeur :", seller?.phone);
 
       if (!seller?.phone) continue;
 
@@ -210,7 +216,9 @@ Client: ${orderMain.customer_name}
 📞 ${orderMain.customer_phone}
       `.trim();
 
-      await fetch('/api/send-sms', {
+      console.log("   Message SMS :", message);
+
+      const smsResponse = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -218,12 +226,15 @@ Client: ${orderMain.customer_name}
           message,
         }),
       });
+
+      console.log("   Réponse API SMS :", smsResponse);
     }
 
     //////////////////////////////////////////////////////////////
     // 4️⃣ SMS CLIENT
     //////////////////////////////////////////////////////////////
-    await fetch('/api/send-sms', {
+    console.log("➡️ Envoi SMS au client :", orderMain.customer_phone);
+    const smsClientResponse = await fetch('/api/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -231,6 +242,7 @@ Client: ${orderMain.customer_name}
         message: `AValide : votre commande #${orderId} a bien été reçue. Merci pour votre confiance.`,
       }),
     });
+    console.log("   Réponse API SMS client :", smsClientResponse);
 
     return orderId;
 
