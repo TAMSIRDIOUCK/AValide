@@ -61,7 +61,6 @@ const App: React.FC = () => {
       await requestNotificationPermission();
       const token = await getFcmToken();
       if (token) {
-        // 🔹 Envoyer ce token au serveur Supabase
         console.log("Envoyer ce token au serveur :", token);
       }
 
@@ -76,7 +75,15 @@ const App: React.FC = () => {
 
   return (
     <>
+      {/* --- META / MANIFEST / FAVICON --- */}
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/favicon.ico" />
+        <meta name="theme-color" content="#4f46e5" />
+      </head>
+
       <Header />
+
       <Routes>
         {/* Pages publiques */}
         <Route path="/" element={<HomePage />} />

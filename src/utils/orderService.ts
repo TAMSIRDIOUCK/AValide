@@ -172,7 +172,6 @@ export const createOrder = async (orderData: any): Promise<string> => {
     //////////////////////////////////////////////////////////////
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
 
-
     for (const sellerId of sellers) {
       console.log("➡️ Notification vendeur pour sellerId :", sellerId);
 
@@ -200,8 +199,6 @@ export const createOrder = async (orderData: any): Promise<string> => {
         .eq('id', sellerId)
         .single();
 
-      console.log("   Numéro vendeur :", seller?.phone);
-
       if (!seller?.phone) continue;
 
       const sellerItems = order_items.filter(
@@ -216,33 +213,30 @@ Client: ${orderMain.customer_name}
 📞 ${orderMain.customer_phone}
       `.trim();
 
-      console.log("   Message SMS :", message);
-
+      // ✅ Avant l'envoi SMS vendeur
+      console.log("➡️ Envoi SMS au vendeur :", seller.phone, message);
       const smsResponse = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: seller.phone,
-          message,
-        }),
+        body: JSON.stringify({ phone: seller.phone, message }),
       });
-
-      console.log("   Réponse API SMS :", smsResponse);
+      console.log("📤 Réponse API SMS vendeur :", smsResponse);
     }
 
     //////////////////////////////////////////////////////////////
     // 4️⃣ SMS CLIENT
     //////////////////////////////////////////////////////////////
+    const clientMessage = `AValide : votre commande #${orderId} a bien été reçue. Merci pour votre confiance.`;
     console.log("➡️ Envoi SMS au client :", orderMain.customer_phone);
     const smsClientResponse = await fetch('/api/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         phone: orderMain.customer_phone,
-        message: `AValide : votre commande #${orderId} a bien été reçue. Merci pour votre confiance.`,
+        message: clientMessage,
       }),
     });
-    console.log("   Réponse API SMS client :", smsClientResponse);
+    console.log("📤 Réponse API SMS client :", smsClientResponse);
 
     return orderId;
 
