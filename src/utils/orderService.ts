@@ -140,7 +140,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH + SMS secours + SMS client
+// 🔵 Création commande + PUSH + SMS (POUR TOUS) + SMS client
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
@@ -167,56 +167,62 @@ export const createOrder = async (orderData: any): Promise<string> => {
       );
     }
 
-    // 3️⃣ Notifications vendeurs (Push → SMS fallback)
-    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
+    //////////////////////////////////////////////////////////////
+    // 3️⃣ NOTIFICATION VENDEURS (PUSH + SMS TOUJOURS)
+    //////////////////////////////////////////////////////////////
+    const sellers: string[] = [
+      ...new Set(order_items.map((i: any) => i.seller_id)),
+    ] as string[];
 
     for (const sellerId of sellers) {
+      // 🔹 PUSH (si token existe)
       const { data: tokens } = await supabase
         .from('user_tokens')
         .select('fcm_token')
         .eq('seller_id', sellerId);
 
       if (tokens && tokens.length > 0) {
-        // 🔔 PUSH
         await fetch('/api/send-notification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sellerId }),
         });
-      } else {
-        // 📩 SMS secours
-        const { data: seller } = await supabase
-          .from('profiles')
-          .select('phone')
-          .eq('id', sellerId)
-          .single();
+      }
 
-        if (!seller?.phone) continue;
+      // 📩 SMS (TOUJOURS)
+      const { data: seller } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', sellerId)
+        .single();
 
-        const sellerItems = order_items.filter(
-          (i: any) => i.seller_id === sellerId
-        );
+      if (!seller?.phone) continue;
 
-        const message = `
+      const sellerItems = order_items.filter(
+        (i: any) => i.seller_id === sellerId
+      );
+
+      const message = `
 AValide 📦
 Nouvelle commande !
 Articles: ${sellerItems.length}
 Client: ${orderMain.customer_name}
 📞 ${orderMain.customer_phone}
-        `.trim();
+      `.trim();
 
-        await fetch('/api/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: seller.phone,
-            message,
-          }),
-        });
-      }
+      await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: seller.phone,
+          message,
+        }),
+      });
     }
 
-    // 4️⃣ SMS client
+    //////////////////////////////////////////////////////////////
+    // 4️⃣ SMS CLIENT
+    //////////////////////////////////////////////////////////////
     await fetch('/api/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
