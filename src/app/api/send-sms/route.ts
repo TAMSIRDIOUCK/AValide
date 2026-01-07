@@ -3,29 +3,29 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { phone, message } = await req.json();
-    console.log("📩 Reçu pour envoi SMS :", phone, message);
+    const body = await req.json();
+    console.log("📩 Requête SMS reçue :", body);
+
+    const { phone, message } = body;
 
     if (!phone || !message) {
-      console.warn("⚠️ Missing phone or message");
-      return NextResponse.json({ error: "Missing phone or message" }, { status: 400 });
+      console.error("❌ Données manquantes");
+      return NextResponse.json(
+        { error: "Missing phone or message" },
+        { status: 400 }
+      );
     }
 
-    // 🔹 Exemple de test
-    console.log("✅ Envoi SMS simulé :", phone, message);
-
-    // Ici tu mettrais l'appel réel à Wave ou Twilio
-    // Ex : await sendWaveSMS(phone, message);
+    // 🔹 SIMULATION SMS (pour test)
+    console.log("✅ SMS simulé envoyé à :", phone);
+    console.log("📨 Message :", message);
 
     return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("❌ Erreur route /send-sms :", err);
-    return NextResponse.json({ error: "SMS failed" }, { status: 500 });
+  } catch (error) {
+    console.error("❌ Erreur API send-sms :", error);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-}
-
-// Gérer GET ou autres méthodes pour éviter 405 non informatif
-export async function GET() {
-  console.warn("⚠️ Tentative GET sur /send-sms");
-  return NextResponse.json({ error: "GET not allowed, use POST" }, { status: 405 });
 }
