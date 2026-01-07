@@ -1,24 +1,30 @@
+/// <reference lib="deno.ns" />
+
+// Types Supabase Edge Runtime
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-console.log("🚀 send-order-notification function loaded");
+console.log("🚀 Edge Function send-order-notification prête");
 
 Deno.serve(async (req: Request) => {
   try {
-    const body = await req.json();
-    console.log("📥 Payload reçu :", body);
+    const payload = await req.json();
+    console.log("📥 Données reçues :", payload);
 
     return new Response(
-      JSON.stringify({ success: true, body }),
+      JSON.stringify({
+        success: true,
+        received: payload,
+      }),
       {
+        status: 200,
         headers: { "Content-Type": "application/json" },
-        status: 200
       }
     );
-  } catch (err) {
-    console.error("❌ Erreur Edge Function :", err);
+  } catch (error) {
+    console.error("❌ Erreur Edge Function :", error);
 
     return new Response(
-      JSON.stringify({ error: "Invalid JSON" }),
+      JSON.stringify({ error: "Invalid request body" }),
       { status: 400 }
     );
   }
