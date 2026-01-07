@@ -1,6 +1,7 @@
 // src/App.tsx
 import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Helmet } from "react-helmet"; // Pour gérer le <head>
 import { useAuth } from "./context/AuthContext";
 import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
 import { getFcmToken, listenForegroundNotifications } from "./lib/firebase";
@@ -54,7 +55,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initFirebase = async () => {
-      // 1️⃣ Enregistrer le service worker (arrière-plan)
+      // 1️⃣ Enregistrer le service worker
       await registerServiceWorker();
 
       // 2️⃣ Demander la permission et récupérer le token
@@ -76,11 +77,12 @@ const App: React.FC = () => {
   return (
     <>
       {/* --- META / MANIFEST / FAVICON --- */}
-      <head>
+      <Helmet>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" />
         <meta name="theme-color" content="#4f46e5" />
-      </head>
+        <title>AValide - Marketplace Sénégal</title>
+      </Helmet>
 
       <Header />
 

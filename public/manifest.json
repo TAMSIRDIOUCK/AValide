@@ -1,21 +1,21 @@
 {
-    "name": "AValide",
-    "short_name": "AValide",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#ff6600",
-    "icons": [
-      {
-        "src": "/videos/IMG_1696.jpg",
-        "sizes": "192x192",
-        "type": "image/png"
-      },
-      {
-        "src": "/videos/IMG_1696.jpg",
-        "sizes": "512x512",
-        "type": "image/jpg"
-      }
-    ]
-  }
-  
+  "name": "AValide",
+  "short_name": "AValide",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff6600",
+  "icons": [
+    {
+      "src": "/videos/IMG_1696.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/videos/IMG_1696.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
