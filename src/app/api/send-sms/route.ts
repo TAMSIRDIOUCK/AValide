@@ -1,6 +1,16 @@
 // src/app/api/send-sms/route.ts
 import { NextResponse } from "next/server";
 
+export async function OPTIONS() {
+  return NextResponse.json(null, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -20,12 +30,16 @@ export async function POST(req: Request) {
     console.log("✅ SMS simulé envoyé à :", phone);
     console.log("📨 Message :", message);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     console.error("❌ Erreur API send-sms :", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   }
 }
