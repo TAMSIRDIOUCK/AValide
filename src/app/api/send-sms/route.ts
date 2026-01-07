@@ -11,13 +11,16 @@ export async function OPTIONS() {
   });
 }
 
+// Added console logs to debug the 401 Unauthorized error
 export async function POST(req: Request) {
   try {
     const apiKey = req.headers.get("Authorization");
+    console.log("🔍 Received Authorization header:", apiKey);
+
     const validApiKey = "your-secret-api-key"; // Replace with your actual API key
 
     if (!apiKey || apiKey !== `Bearer ${validApiKey}`) {
-      console.error("❌ Unauthorized access");
+      console.error("❌ Unauthorized access. Provided API key:", apiKey);
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401, headers: { "Access-Control-Allow-Origin": "*" } }
