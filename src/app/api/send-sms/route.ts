@@ -13,6 +13,17 @@ export async function OPTIONS() {
 
 export async function POST(req: Request) {
   try {
+    const apiKey = req.headers.get("Authorization");
+    const validApiKey = "your-secret-api-key"; // Replace with your actual API key
+
+    if (!apiKey || apiKey !== `Bearer ${validApiKey}`) {
+      console.error("❌ Unauthorized access");
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: { "Access-Control-Allow-Origin": "*" } }
+      );
+    }
+
     const body = await req.json();
     console.log("📩 Requête SMS reçue :", body);
 
