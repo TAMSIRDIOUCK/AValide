@@ -9,12 +9,11 @@
     }
   ],
   "compilerOptions": {
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": [
-        "*"
-      ]
-    },
+   "baseUrl": ".",
+"paths": {
+  "@/*": ["src/*"]
+}
+,
     "types": [
       "node",
       "react",
