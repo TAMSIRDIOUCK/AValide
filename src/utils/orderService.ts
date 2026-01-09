@@ -172,7 +172,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
     //////////////////////////////////////////////////////////////
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
 
-
+    // ... tout le code précédent reste inchangé ...
     for (const sellerId of sellers) {
       console.log("➡️ Notification vendeur pour sellerId :", sellerId);
 
@@ -204,48 +204,22 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
       if (!seller?.email) continue;
 
-      const sellerItems = order_items.filter(
-        (i: any) => i.seller_id === sellerId
-      );
-
-      const message = `
-AValide 📦
-Nouvelle commande !
-Articles: ${sellerItems.length}
-Client: ${orderMain.customer_name}
-📞 ${orderMain.customer_phone}
-      `.trim();
-
-      console.log("   Message email :", message);
-
-      const emailResponse = await fetch("/api/send-email", {
+      // 🔹 Utilisation de ton fetch simplifié
+      await fetch("/api/send-email", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: seller?.email, // email du vendeur
-          subject: "Nouvelle commande sur AValide",
-          message: `Vous avez reçu une nouvelle commande de ${orderMain.total} F CFA.`,
+          email: seller.email,
+          subject: "Nouvelle commande",
+          message: "Vous avez une nouvelle commande",
         }),
       });
-      console.log("   Réponse API email vendeur :", emailResponse);
     }
 
     //////////////////////////////////////////////////////////////
     // 4️⃣ SMS CLIENT
     //////////////////////////////////////////////////////////////
     // Removed SMS client notification logic as requested
-    // console.log("➡️ Envoi SMS au client :", orderMain.customer_phone);
-    // const smsClientResponse = await fetch('/api/send-sms', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     phone: orderMain.customer_phone,
-    //     message: `AValide : votre commande #${orderId} a bien été reçue. Merci pour votre confiance.`,
-    //   }),
-    // });
-    // console.log("   Réponse API SMS client :", smsClientResponse);
 
     return orderId;
 
