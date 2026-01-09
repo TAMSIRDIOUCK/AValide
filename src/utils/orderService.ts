@@ -172,7 +172,6 @@ export const createOrder = async (orderData: any): Promise<string> => {
     //////////////////////////////////////////////////////////////
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
 
-    // ... tout le code précédent reste inchangé ...
     for (const sellerId of sellers) {
       console.log("➡️ Notification vendeur pour sellerId :", sellerId);
 
@@ -204,16 +203,34 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
       if (!seller?.email) continue;
 
-      // 🔹 Utilisation de ton fetch simplifié
-      await fetch("/api/send-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: seller.email,
-          subject: "Nouvelle commande",
-          message: "Vous avez une nouvelle commande",
-        }),
-      });
+      // 🔹 Fetch email avec logs et gestion d'erreurs
+      try {
+        console.log("➡️ Envoi email à :", seller.email);
+
+        const emailResponse = await fetch("/api/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: seller.email,
+            subject: "Nouvelle commande",
+            message: "Vous avez une nouvelle commande",
+          }),
+        });
+
+        console.log("   Status response :", emailResponse.status);
+
+        const result = await emailResponse.json().catch(() => null);
+        console.log("   Result send-email :", result);
+
+        if (!emailResponse.ok) {
+          console.error("❌ Erreur en envoyant le mail :", result);
+        } else {
+          console.log("✅ Email envoyé avec succès !");
+        }
+
+      } catch (err) {
+        console.error("❌ Exception lors de l'envoi du mail :", err);
+      }
     }
 
     //////////////////////////////////////////////////////////////
