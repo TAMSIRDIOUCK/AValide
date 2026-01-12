@@ -140,7 +140,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + EMAIL automatique
+// 🔵 Création commande + EMAIL + PUSH
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
@@ -167,19 +167,38 @@ export const createOrder = async (orderData: any): Promise<string> => {
       );
     }
 
-    // 3️⃣ Envoyer email aux vendeurs
+    // 3️⃣ Récupérer les vendeurs uniques
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
 
     for (const sellerId of sellers) {
-      const { data: seller } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', sellerId)
-        .single();
-
-      if (!seller?.email) continue;
-
+      // 🔹 Envoyer push notification
       try {
+        const { data: tokens } = await supabase
+          .from('user_tokens')
+          .select('fcm_token')
+          .eq('seller_id', sellerId);
+
+        if (tokens?.length) {
+          await fetch("/api/send-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sellerId }),
+          });
+        }
+      } catch (err) {
+        console.warn("Erreur push notification :", err);
+      }
+
+      // 🔹 Envoyer email
+      try {
+        const { data: seller } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', sellerId)
+          .single();
+
+        if (!seller?.email) continue;
+
         await fetch("http://localhost:4000/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -190,7 +209,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
           }),
         });
       } catch (err) {
-        console.error("Erreur en envoyant email:", err);
+        console.error("Erreur en envoyant email :", err);
       }
     }
 
