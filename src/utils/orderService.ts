@@ -140,7 +140,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + EMAIL + PUSH
+// 🔵 Création commande + EMAIL automatique
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
@@ -148,7 +148,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
     // 1️⃣ Créer la commande principale
     const { data, error } = await supabase
-      .from("orders")
+      .from('orders')
       .insert(orderMain)
       .select()
       .single();
@@ -159,7 +159,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
     // 2️⃣ Insérer les items
     if (order_items?.length) {
-      await supabase.from("order_items").insert(
+      await supabase.from('order_items').insert(
         order_items.map((item: any) => ({
           ...item,
           order_id: orderId,
@@ -167,47 +167,37 @@ export const createOrder = async (orderData: any): Promise<string> => {
       );
     }
 
-    // 3️⃣ Envoyer email et push aux vendeurs
+    // 3️⃣ Envoyer email aux vendeurs
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
+
     for (const sellerId of sellers) {
-      // 🔹 Email
       const { data: seller } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", sellerId)
+        .from('profiles')
+        .select('email')
+        .eq('id', sellerId)
         .single();
 
-      if (seller?.email) {
-        try {
-          await fetch("http://localhost:4000/send-email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: seller.email,
-              subject: "Nouvelle commande AVALIDE",
-              message: `Vous avez une nouvelle commande.`,
-            }),
-          });
-        } catch (err) {
-          console.error("Erreur en envoyant email:", err);
-        }
-      }
+      if (!seller?.email) continue;
 
-      // 🔹 Push
       try {
-        await fetch("http://localhost:4001/send-notification", {
+        await fetch("http://localhost:4000/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sellerId }),
+          body: JSON.stringify({
+            email: seller.email,
+            subject: "Nouvelle commande AVALIDE",
+            message: `Vous avez une nouvelle commande.`
+          }),
         });
       } catch (err) {
-        console.error("Erreur en envoyant le push:", err);
+        console.error("Erreur en envoyant email:", err);
       }
     }
 
     return orderId;
+
   } catch (err) {
-    console.error("Erreur createOrder :", err);
+    console.error('Erreur createOrder :', err);
     throw err;
   }
 };
