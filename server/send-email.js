@@ -1,47 +1,44 @@
-import express from 'express';
-import nodemailer from 'nodemailer';
-import cors from 'cors';
+// server/send-email.js
+import express from "express";
+import cors from "cors";
+import nodemailer from "nodemailer";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Fonction pour envoyer l'email
-export async function sendEmail({ email, subject, message }) {
-  if (!email) throw new Error('Email manquant');
+const PORT = 4000;
 
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.example.com', // remplace par ton SMTP
-    port: 587,
-    auth: {
-      user: 'ton@mail.com', // ton email
-      pass: 'motdepasse',   // mot de passe SMTP
-    },
-  });
+// Remplace avec ton vrai SMTP
+const transporter = nodemailer.createTransport({
+  host: "smtp.example.com", // ex: smtp.gmail.com
+  port: 587,
+  secure: false,
+  auth: {
+    user: "ton@email.com",
+    pass: "motdepasse",
+  },
+});
 
-  await transporter.sendMail({
-    from: '"AVALIDE" <ton@mail.com>',
-    to: email,
-    subject,
-    text: message,
-  });
-
-  return { success: true };
-}
-
-// Route POST pour envoyer un email
-app.post('/send-email', async (req, res) => {
+app.post("/send-email", async (req, res) => {
   try {
-    const result = await sendEmail(req.body);
-    res.json(result);
+    const { email, subject, message } = req.body;
+    if (!email) return res.status(400).json({ error: "Email manquant" });
+
+    await transporter.sendMail({
+      from: '"AVALIDE" <ton@email.com>',
+      to: email,
+      subject,
+      text: message,
+    });
+
+    return res.json({ success: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error("Erreur send-email:", err);
+    return res.status(500).json({ error: "Impossible d'envoyer l'email" });
   }
 });
 
-// Démarrer le serveur
-const PORT = 4000;
-app.listen(PORT, () => console.log(`Server send-email running on port ${PORT}`));
-
-export default app;
+app.listen(PORT, () => {
+  console.log(`Serveur email lancé sur http://localhost:${PORT}`);
+});
