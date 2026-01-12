@@ -140,13 +140,13 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH + SMS (POUR TOUS) + SMS client
+// 🔵 Création commande + EMAIL automatique
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
-    // 1️⃣ Créer la commande
+    // 1️⃣ Créer la commande principale
     const { data, error } = await supabase
       .from('orders')
       .insert(orderMain)
@@ -167,81 +167,37 @@ export const createOrder = async (orderData: any): Promise<string> => {
       );
     }
 
-    //////////////////////////////////////////////////////////////
-    // 3️⃣ NOTIFICATION VENDEURS (PUSH + EMAIL TOUJOURS)
-    //////////////////////////////////////////////////////////////
-    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
+    // 3️⃣ Envoyer email aux vendeurs
+    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
 
     for (const sellerId of sellers) {
-      console.log("➡️ Notification vendeur pour sellerId :", sellerId);
-
-      // 🔹 PUSH (si token existe)
-      const { data: tokens } = await supabase
-        .from('user_tokens')
-        .select('fcm_token')
-        .eq('seller_id', sellerId);
-
-      console.log("   Tokens FCM trouvés :", tokens);
-
-      if (tokens && tokens.length > 0) {
-        console.log("   Envoi PUSH au vendeur...");
-        await fetch('/api/send-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sellerId }),
-        });
-      }
-
-      // 📩 EMAIL (TOUJOURS)
       const { data: seller } = await supabase
         .from('profiles')
         .select('email')
         .eq('id', sellerId)
         .single();
 
-      console.log("   Email vendeur :", seller?.email);
-
       if (!seller?.email) continue;
 
-      // 🔹 Fetch email avec logs et gestion d'erreurs
       try {
-        console.log("➡️ Envoi email à :", seller.email);
-
-        const emailResponse = await fetch("/api/send-email", {
+        await fetch("http://localhost:4000/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: seller.email,
-            subject: "Nouvelle commande",
-            message: "Vous avez une nouvelle commande",
+            subject: "Nouvelle commande AVALIDE",
+            message: `Vous avez une nouvelle commande.`
           }),
         });
-
-        console.log("   Status response :", emailResponse.status);
-
-        const result = await emailResponse.json().catch(() => null);
-        console.log("   Result send-email :", result);
-
-        if (!emailResponse.ok) {
-          console.error("❌ Erreur en envoyant le mail :", result);
-        } else {
-          console.log("✅ Email envoyé avec succès !");
-        }
-
       } catch (err) {
-        console.error("❌ Exception lors de l'envoi du mail :", err);
+        console.error("Erreur en envoyant email:", err);
       }
     }
-
-    //////////////////////////////////////////////////////////////
-    // 4️⃣ SMS CLIENT
-    //////////////////////////////////////////////////////////////
-    // Removed SMS client notification logic as requested
 
     return orderId;
 
   } catch (err) {
-    console.error('❌ Exception createOrder :', err);
+    console.error('Erreur createOrder :', err);
     throw err;
   }
 };
