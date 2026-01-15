@@ -40,39 +40,35 @@ export interface CartItem {
 // Item d’une commande (tel que Supabase le renvoie)
 export interface OrderItem {
   id: string;
-  order_id: string;            // 🔥 ajouté
-  created_at: string;          // 🔥 ajouté par Supabase automatiquement
-
+  order_id: string;          // correspond à order_items.order_id
   productId: string;
-  sellerId: string;
+  seller_id: string;          // correspond à order_items.seller_id
+  seller_email: string;       // correspond à order_items.seller_email
   title: string;
   images: string[];
   quantity: number;
   price: number;
-  status: string;
-
+  variantSize: string;
+  variantColor: string;
+  variantPrice: number | null;
   customerName: string;
   customerPhone: string;
   customerAddress: string;
-
-  selectedVariant?: ProductVariant; // Variant sélectionnée
+  status: string;
+  created_at: string;
 }
 
-// Commande complète
 export interface Order {
   id: string;
   userId: string;
   createdAt: string;
   total: number;
-
   customerName: string;
   customerPhone: string;
   customerAddress: string;
-  customerEmail?: string;
-  additionalInfo?: string;
-
   paymentMethod: string;
   status: string;
-
+  seller_id: string;          // ajouté
+  seller_email: string;       // ajouté
   items: OrderItem[];
 }

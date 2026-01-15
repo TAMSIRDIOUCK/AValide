@@ -45,7 +45,7 @@
     "**/*.css",
     "**/*.scss",
     "**/*.sass"
-  ],
+, "server/send-email.js"  ],
   "exclude": [
     "node_modules"
   ]
