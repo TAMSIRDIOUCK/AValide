@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { Order, OrderItem } from '../types/types';
+import { Order } from '../types/types';
 
 //////////////////////////////////////////////////////////////
 // 🔎 Parse TEXT → JSON sécurisé
@@ -31,22 +31,13 @@ function mapOrderFields(order: any): Order {
     customerAddress: order.customer_address,
     paymentMethod: order.payment_method ?? 'inconnu',
     status: order.status ?? 'pending',
-    seller_id: order.seller_id,
-    seller_email: order.seller_email,
-    items: (order.order_items || []).map((item: any): OrderItem => {
+    items: (order.order_items || []).map((item: any) => {
       const variant = tryParseVariant(item.selected_variant);
-      const images: string[] = item.image_url
-        ? [item.image_url].filter((img: unknown): img is string => !!img)
-        : [];
-
       return {
-        id: item.id,
-        order_id: item.order_id,
         productId: item.product_id,
-        seller_id: item.seller_id,
-        seller_email: item.seller_email,
-        title: item.title ?? 'Produit',
-        images,
+        sellerId: item.seller_id,
+        title: item.title || 'Produit',
+        image: item.image_url ? [item.image_url] : [],
         quantity: item.quantity,
         price: item.price,
         variantSize: variant.size ?? '',
@@ -56,7 +47,6 @@ function mapOrderFields(order: any): Order {
         customerPhone: item.customer_phone ?? '',
         customerAddress: item.customer_address ?? '',
         status: item.status ?? 'en_attente',
-        created_at: item.created_at,
       };
     }),
   };
@@ -76,7 +66,6 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       payment_method,
       status,
       seller_id,
-      seller_email,
       customer_name,
       customer_phone,
       customer_address,
@@ -87,15 +76,13 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
         quantity,
         price,
         seller_id,
-        seller_email,
         image_url,
         title,
         selected_variant,
         customer_name,
         customer_phone,
         customer_address,
-        status,
-        created_at
+        status
       )
     `)
     .order('created_at', { ascending: false });
@@ -116,7 +103,7 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 //////////////////////////////////////////////////////////////
 // 🔵 Items vendeur
 //////////////////////////////////////////////////////////////
-export async function getOrderItemsBySeller(sellerId: string): Promise<OrderItem[]> {
+export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
   const { data, error } = await supabase
     .from('order_items')
     .select('*')
@@ -125,30 +112,13 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<OrderItem
 
   if (error || !data) return [];
 
-  return data.map((item: any): OrderItem => {
+  return data.map((item: any) => {
     const variant = tryParseVariant(item.selected_variant);
-    const images: string[] = item.image_url
-      ? [item.image_url].filter((img: unknown): img is string => !!img)
-      : [];
-
     return {
-      id: item.id,
-      order_id: item.order_id,
-      productId: item.product_id,
-      seller_id: item.seller_id,
-      seller_email: item.seller_email,
-      title: item.title ?? 'Produit',
-      images,
-      quantity: item.quantity,
-      price: item.price,
+      ...item,
       variantSize: variant.size ?? '',
       variantColor: variant.color ?? '',
       variantPrice: variant.price ?? null,
-      customerName: item.customer_name ?? '',
-      customerPhone: item.customer_phone ?? '',
-      customerAddress: item.customer_address ?? '',
-      status: item.status ?? 'en_attente',
-      created_at: item.created_at,
     };
   });
 }
@@ -164,27 +134,21 @@ export const createOrder = async (orderData: any): Promise<string> => {
       throw new Error("order_items vide");
     }
 
-    // 1️⃣ Déterminer le seller principal
+    // 1️⃣ Déterminer le seller_id principal (premier vendeur)
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
-    const mainSellerId = sellers[0];
-    const mainSellerItem = order_items.find((i: any) => i.seller_id === mainSellerId);
-    const mainSellerEmail = mainSellerItem?.seller_email ?? '';
+    const mainSellerId = sellers[0]; // ✅ seller principal pour orders.seller_id
 
-    // 2️⃣ Créer la commande avec seller_id et seller_email
+    // 2️⃣ Créer la commande avec seller_id
     const { data: order, error } = await supabase
       .from('orders')
-      .insert({
-        ...orderMain,
-        seller_id: mainSellerId,
-        seller_email: mainSellerEmail,
-      })
+      .insert({ ...orderMain, seller_id: mainSellerId })
       .select()
       .single();
 
     if (error || !order) throw error;
     const orderId = order.id;
 
-    // 3️⃣ Insérer les items avec order_id
+    // 3️⃣ Insérer les items
     await supabase.from('order_items').insert(
       order_items.map((item: any) => ({
         ...item,
@@ -194,19 +158,15 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
     // 4️⃣ Boucle sur chaque vendeur unique
     for (const sellerId of sellers) {
-      const sellerItem = order_items.find((i: any) => i.seller_id === sellerId);
-      const sellerEmail = sellerItem?.seller_email;
-      if (!sellerEmail) continue;
 
       //////////////////////////////////////////////////
-      // 🔔 PUSH NOTIFICATION (non bloquant)
+      // 🔔 PUSH NOTIFICATION
       //////////////////////////////////////////////////
       try {
         const { data: tokens } = await supabase
           .from('user_tokens')
           .select('fcm_token')
-          .eq('seller_id', sellerId)
-          .limit(1); // ✅ limite à 1 token pour éviter doublons
+          .eq('seller_id', sellerId);
 
         if (tokens?.length) {
           await fetch('/api/send-notification', {
@@ -216,35 +176,46 @@ export const createOrder = async (orderData: any): Promise<string> => {
           });
         }
       } catch (e) {
-        console.warn('Push error (non bloquant):', e);
+        console.warn('Push error:', e);
       }
 
       //////////////////////////////////////////////////
-      // 📧 EMAIL → emails_to_send (non bloquant)
+      // 📧 EMAIL → emails_to_send
       //////////////////////////////////////////////////
       try {
-        // ✅ Vérifie si un email existe déjà pour ce seller + commande
-        const { data: existingEmail } = await supabase
-          .from('emails_to_send')
-          .select('id')
-          .eq('order_id', orderId)
-          .eq('seller_email', sellerEmail)
+        const { data: seller } = await supabase
+          .from('profils') // ✅ table correcte
+          .select('email')
+          .eq('id', sellerId)
           .single();
 
-        if (!existingEmail) {
-          await supabase.from('emails_to_send').insert({
-            order_id: orderId,
-            seller_id: sellerId,
-            seller_email: sellerEmail,
-            status: 'pending',
-          });
+        if (!seller?.email) continue;
+
+        const emailRow = {
+          recipient: seller.email,
+          subject: 'Nouvelle commande AVALIDE',
+          body: 'Vous avez reçu une nouvelle commande.', // utiliser `body` au lieu de `message` si c’est la colonne de la table
+          seller_id: sellerId,
+          order_id: orderId,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+        };
+
+        const { error: emailError } = await supabase
+          .from('emails_to_send')
+          .insert(emailRow);
+
+        if (emailError) {
+          console.error('Erreur emails_to_send:', emailError);
         }
+
       } catch (err) {
-        console.warn('Email error (non bloquant):', err);
+        console.error('Erreur email:', err);
       }
     }
 
     return orderId;
+
   } catch (err) {
     console.error('❌ createOrder FAILED:', err);
     throw err;

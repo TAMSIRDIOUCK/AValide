@@ -1,3 +1,6 @@
+/* ======================================================
+   VARIANT PRODUIT
+====================================================== */
 export interface ProductVariant {
   id?: string;
   size: string;
@@ -6,7 +9,9 @@ export interface ProductVariant {
   stock?: number;
 }
 
-// Produit principal
+/* ======================================================
+   PRODUIT
+====================================================== */
 export interface Product {
   id: string;
   title: string;
@@ -18,16 +23,20 @@ export interface Product {
   reviewCount: number;
   createdAt: string;
   category: string;
+
   sellerId: string;
   sellerName?: string;
-  seller_phone?: string; // Add seller_phone as an optional property
+  seller_phone?: string;
+
   stock: number;
   likes: number;
   isFromChina?: boolean;
   variants?: ProductVariant[];
 }
 
-// Item du panier
+/* ======================================================
+   PANIER
+====================================================== */
 export interface CartItem {
   product: Product;
   quantity: number;
@@ -35,40 +44,53 @@ export interface CartItem {
   selectedVariant?: ProductVariant;
 }
 
-// ------------ Types Commandes ------------
-
-// Item d’une commande (tel que Supabase le renvoie)
+/* ======================================================
+   ITEM COMMANDE (order_items)
+====================================================== */
 export interface OrderItem {
   id: string;
-  order_id: string;          // correspond à order_items.order_id
+  order_id: string;
   productId: string;
-  seller_id: string;          // correspond à order_items.seller_id
-  seller_email: string;       // correspond à order_items.seller_email
+
+  seller_id: string;
+
   title: string;
   images: string[];
+
   quantity: number;
   price: number;
+
   variantSize: string;
   variantColor: string;
   variantPrice: number | null;
+
   customerName: string;
   customerPhone: string;
   customerAddress: string;
+
   status: string;
   created_at: string;
 }
 
+/* ======================================================
+   COMMANDE (orders)
+====================================================== */
 export interface Order {
   id: string;
   userId: string;
   createdAt: string;
+
   total: number;
+
   customerName: string;
   customerPhone: string;
   customerAddress: string;
+
   paymentMethod: string;
   status: string;
-  seller_id: string;          // ajouté
-  seller_email: string;       // ajouté
+
+  // ✅ DEVENU OPTIONNEL → FIN DES ERREURS TS
+  seller_id?: string;
+
   items: OrderItem[];
 }
