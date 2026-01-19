@@ -1,10 +1,13 @@
-// src/App.tsx
 import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Helmet } from "react-helmet"; // Pour gérer le <head>
+import { Helmet } from "react-helmet";
 import { useAuth } from "./context/AuthContext";
-import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
-import { getFcmToken, listenForegroundNotifications } from "./lib/firebase";
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+  getFcmToken,
+  listenForegroundNotifications
+} from "./lib/firebaseMessaging"; // Assurez-vous que ces 2 fonctions sont exportées
 
 // --- Components & Pages ---
 import Header from "./components/layout/Header";
@@ -55,19 +58,28 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initFirebase = async () => {
-      // 1️⃣ Enregistrer le service worker
-      await registerServiceWorker();
+      try {
+        // 1️⃣ Enregistrer le service worker
+        await registerServiceWorker();
 
-      // 2️⃣ Demander la permission et récupérer le token
-      await requestNotificationPermission();
-      const token = await getFcmToken();
-      if (token) {
-        console.log("Envoyer ce token au serveur :", token);
-      }
+        // 2️⃣ Demander la permission notifications (Android / Desktop)
+        const permissionGranted = await requestNotificationPermission();
+        if (!permissionGranted) {
+          console.warn("[FCM] L'utilisateur n'a pas autorisé les notifications");
+          return;
+        }
 
-      // 3️⃣ Écoute notifications en premier plan
-      if ("Notification" in window && Notification.permission === "granted") {
+        // 3️⃣ Récupérer le token FCM et envoyer au serveur
+        const token = await getFcmToken();
+        if (token) {
+          console.log("[FCM] Token récupéré :", token);
+          // Ici tu peux l'envoyer à ton backend
+        }
+
+        // 4️⃣ Écoute notifications en premier plan (Android / Desktop)
         listenForegroundNotifications();
+      } catch (err) {
+        console.error("[FCM] Erreur initialisation Firebase :", err);
       }
     };
 
@@ -76,7 +88,6 @@ const App: React.FC = () => {
 
   return (
     <>
-      {/* --- META / MANIFEST / FAVICON --- */}
       <Helmet>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" />

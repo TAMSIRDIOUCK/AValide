@@ -23,7 +23,7 @@ const supabase = createClient(
 // 🔹 API Handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // 🔹 Récupérer sellerId depuis le body
+    // 🔹 Récupérer sellerId et orderId depuis le body
     const { sellerId, orderId } = req.body;
 
     // 🔹 Récupérer tous les tokens FCM du vendeur
@@ -46,9 +46,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ message: 'Aucun token FCM' });
     }
 
-    // 🔹 Envoi des notifications via Firebase Admin (DATA ONLY)
+    // 🔹 Envoi des notifications via Firebase Admin
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
+      // ✅ Notification visible pour Android / Desktop
+      notification: {
+        title: '🛒 Nouvelle commande AValide',
+        body: orderId ? `Commande #${orderId} reçue` : 'Un client vient de passer une commande',
+      },
+      // ✅ Data pour iOS PWA + service worker
       data: {
         title: '🛒 Nouvelle commande AValide',
         body: orderId ? `Commande #${orderId} reçue` : 'Un client vient de passer une commande',

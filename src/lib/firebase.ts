@@ -28,21 +28,48 @@ export const getFcmToken = async () => {
 
 // Notifications en premier plan
 export const listenForegroundNotifications = () => {
+  // Écoute les notifications FCM quand l'app est au premier plan
   onMessage(messaging, (payload) => {
-    const title = payload.notification?.title || "Nouvelle commande AValide";
-    const options = {
-      body: payload.notification?.body || "Vous avez une nouvelle commande",
+    console.log("[FCM] foreground payload:", payload);
+
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    // iOS PWA → NE PAS afficher ici, handled par SW
+    if (isIOS) return;
+
+    // Android / Desktop → affiche la notification frontend
+    const title = payload.notification?.title || payload.data?.title || "Nouvelle commande AValide";
+
+    const options: NotificationOptions = {
+      body: payload.notification?.body || payload.data?.body || "Vous avez une nouvelle commande",
       icon: "/videos/IMG_1696.jpg",
-      badge: "//videos/IMG_1696.jpg",
-      data: { url: "/orders" },
+      badge: "/videos/IMG_1696.jpg",
+      data: { url: payload.data?.url || "/orders", orderId: payload.data?.orderId },
     };
 
+    // Affiche la notification
     const notification = new Notification(title, options);
+
+    // Clic sur la notification → redirection
     notification.onclick = () => {
       window.focus();
-      window.location.href = options.data.url;
+      if (options.data?.url) {
+        window.location.href = options.data.url;
+      }
     };
   });
+};
+
+// DEMANDE DE PERMISSION (Android / Desktop)
+export const requestNotificationPermission = async () => {
+  try {
+    const permission = await Notification.requestPermission();
+    console.log("[FCM] Permission notifications:", permission);
+    return permission === "granted";
+  } catch (err) {
+    console.error("[FCM] Permission error:", err);
+    return false;
+  }
 };
 
 export { messaging };
