@@ -23,34 +23,40 @@ const supabase = createClient(
 // 🔹 API Handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const { sellerId } = req.body;
+    // 🔹 Récupérer sellerId depuis le body
+    const { sellerId, orderId } = req.body;
 
-    let query = supabase.from("user_tokens").select("fcm_token");
+    // 🔹 Récupérer tous les tokens FCM du vendeur
+    let query = supabase.from('user_tokens').select('fcm_token');
     if (sellerId) {
-      query = query.eq("seller_id", sellerId);
+      query = query.eq('seller_id', sellerId);
     }
 
     const { data, error } = await query;
 
     if (error) {
-      console.error("❌ Supabase error:", error);
-      return res.status(500).json({ error: "Erreur récupération tokens" });
+      console.error('❌ Supabase error:', error);
+      return res.status(500).json({ error: 'Erreur récupération tokens' });
     }
 
+    // 🔹 Extraire uniquement les tokens valides
     const tokens = data?.map(t => t.fcm_token).filter(Boolean);
 
     if (!tokens || tokens.length === 0) {
-      return res.status(200).json({ message: "Aucun token FCM" });
+      return res.status(200).json({ message: 'Aucun token FCM' });
     }
 
-    // ✅ DATA ONLY (OBLIGATOIRE)
+    // 🔹 Envoi des notifications via Firebase Admin (DATA ONLY)
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
       data: {
-        title: "🛒 Nouvelle commande",
-        body: "Un client vient de passer une commande",
+        title: '🛒 Nouvelle commande AValide',
+        body: orderId ? `Commande #${orderId} reçue` : 'Un client vient de passer une commande',
+        orderId: orderId ? String(orderId) : '',
       },
     });
+
+    console.log(`[FCM] Envoyé: ${response.successCount}, Échec: ${response.failureCount}`);
 
     return res.status(200).json({
       success: true,
@@ -59,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
   } catch (err) {
-    console.error("❌ Notification error:", err);
-    return res.status(500).json({ error: "Erreur serveur" });
+    console.error('❌ Notification error:', err);
+    return res.status(500).json({ error: 'Erreur serveur' });
   }
 }

@@ -124,7 +124,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH + EMAIL (emails_to_send)
+// 🔵 Création commande + PUSH (sans email)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
@@ -156,61 +156,27 @@ export const createOrder = async (orderData: any): Promise<string> => {
       }))
     );
 
-    // 4️⃣ Boucle sur chaque vendeur unique
+    // 4️⃣ Boucle sur chaque vendeur unique → PUSH NOTIFICATIONS
     for (const sellerId of sellers) {
-
-      //////////////////////////////////////////////////
-      // 🔔 PUSH NOTIFICATION
-      //////////////////////////////////////////////////
       try {
         const { data: tokens } = await supabase
           .from('user_tokens')
           .select('fcm_token')
           .eq('seller_id', sellerId);
 
-        if (tokens?.length) {
-          await fetch('/api/send-notification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sellerId }),
-          });
-        }
+          if (tokens?.length) {
+            await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tokens: tokens.map(t => t.fcm_token),
+                orderId
+              }),
+            });
+          }
+          
       } catch (e) {
         console.warn('Push error:', e);
-      }
-
-      //////////////////////////////////////////////////
-      // 📧 EMAIL → emails_to_send
-      //////////////////////////////////////////////////
-      try {
-        const { data: seller } = await supabase
-          .from('profils') // ✅ table correcte
-          .select('email')
-          .eq('id', sellerId)
-          .single();
-
-        if (!seller?.email) continue;
-
-        const emailRow = {
-          recipient: seller.email,
-          subject: 'Nouvelle commande AVALIDE',
-          body: 'Vous avez reçu une nouvelle commande.', // utiliser `body` au lieu de `message` si c’est la colonne de la table
-          seller_id: sellerId,
-          order_id: orderId,
-          status: 'pending',
-          created_at: new Date().toISOString(),
-        };
-
-        const { error: emailError } = await supabase
-          .from('emails_to_send')
-          .insert(emailRow);
-
-        if (emailError) {
-          console.error('Erreur emails_to_send:', emailError);
-        }
-
-      } catch (err) {
-        console.error('Erreur email:', err);
       }
     }
 
