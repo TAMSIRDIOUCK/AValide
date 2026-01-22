@@ -1,4 +1,3 @@
-// src/utils/orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
 
@@ -163,19 +162,19 @@ export const createOrder = async (orderData: any): Promise<string> => {
         const { data: tokens } = await supabase
           .from('user_tokens')
           .select('fcm_token')
-          .eq('user_id', sellerId);
+          .eq('seller_id', sellerId);
 
-        if (tokens?.length) {
-          await fetch('/api/send-notification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tokens: tokens.map(t => t.fcm_token),
-              orderId
-            }),
-          });
-        }
-
+          if (tokens?.length) {
+            await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tokens: tokens.map(t => t.fcm_token),
+                orderId
+              }),
+            });
+          }
+          
       } catch (e) {
         console.warn('Push error:', e);
       }
