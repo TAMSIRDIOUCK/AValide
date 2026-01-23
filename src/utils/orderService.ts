@@ -89,6 +89,7 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 
   if (error || !data) return [];
 
+  // Filtrer uniquement les items appartenant au vendeur
   return data
     .map((order: any) => ({
       ...order,
@@ -124,39 +125,37 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH (sans email)
+// 🔵 Création commande + PUSH (items corrects)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
-    if (!order_items?.length) {
-      throw new Error("order_items vide");
-    }
+    if (!order_items?.length) throw new Error("order_items vide");
 
-    // 1️⃣ Déterminer le seller_id principal (premier vendeur)
+    // 1️⃣ Déterminer le seller_id principal
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
-    const mainSellerId = sellers[0]; // ✅ seller principal pour orders.seller_id
+    const mainSellerId = sellers[0];
 
-    // 2️⃣ Créer la commande avec seller_id
+    // 2️⃣ Créer la commande
     const { data: order, error } = await supabase
       .from('orders')
       .insert({ ...orderMain, seller_id: mainSellerId })
       .select()
       .single();
-
     if (error || !order) throw error;
     const orderId = order.id;
 
-    // 3️⃣ Insérer les items
-    await supabase.from('order_items').insert(
-      order_items.map((item: any) => ({
-        ...item,
-        order_id: orderId,
-      }))
-    );
+    // 3️⃣ Préparer les items correctement
+    const itemsToInsert = order_items.map((item: any) => ({
+      ...item,
+      order_id: orderId,     // ✅ lien avec la commande
+      seller_id: item.seller_id, // ✅ obligatoire
+    }));
 
-    // 4️⃣ Boucle sur chaque vendeur unique → PUSH NOTIFICATIONS
+    await supabase.from('order_items').insert(itemsToInsert);
+
+    // 4️⃣ Envoyer notification à chaque vendeur
     for (const sellerId of sellers) {
       try {
         const { data: tokens } = await supabase
@@ -164,17 +163,16 @@ export const createOrder = async (orderData: any): Promise<string> => {
           .select('fcm_token')
           .eq('seller_id', sellerId);
 
-          if (tokens?.length) {
-            await fetch('/api/send-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                tokens: tokens.map(t => t.fcm_token),
-                orderId
-              }),
-            });
-          }
-          
+        if (tokens?.length) {
+          await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens: tokens.map(t => t.fcm_token),
+              orderId
+            }),
+          });
+        }
       } catch (e) {
         console.warn('Push error:', e);
       }
