@@ -1,8 +1,8 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import admin from 'firebase-admin';
-import { createClient } from '@supabase/supabase-js';
+import admin from "firebase-admin";
+import { createClient } from "@supabase/supabase-js";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-// 🔹 Init Firebase Admin (safe init)
+/// 🔹 Initialisation Firebase Admin (clé privée depuis les variables d'environnement)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -20,14 +20,17 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
 );
 
-
+// 🔹 API Handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    // 🔹 Récupérer sellerId et orderId depuis le body
     const { sellerId, orderId } = req.body;
 
-    // 🔹 Récupération tokens FCM
+    // 🔹 Récupérer tous les tokens FCM du vendeur
     let query = supabase.from('user_tokens').select('fcm_token');
-    if (sellerId) query = query.eq('seller_id', sellerId);
+    if (sellerId) {
+      query = query.eq('seller_id', sellerId);
+    }
 
     const { data, error } = await query;
 
@@ -36,29 +39,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Erreur récupération tokens' });
     }
 
+    // 🔹 Extraire uniquement les tokens valides
     const tokens = data?.map(t => t.fcm_token).filter(Boolean);
 
     if (!tokens || tokens.length === 0) {
       return res.status(200).json({ message: 'Aucun token FCM' });
     }
 
-    // ✅ MÉTHODE CORRECTE (PAS sendMulticast)
+    // 🔹 Envoi des notifications via Firebase Admin
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
+      // ✅ Notification visible pour Android / Desktop
       notification: {
-        title: '🛒 Nouvelle commande',
-        body: orderId
-          ? `Commande #${orderId} reçue`
-          : 'Un client vient de passer une commande',
+        title: '🛒 Nouvelle commande AValide',
+        body: orderId ? `Commande #${orderId} reçue` : 'Un client vient de passer une commande',
       },
+      // ✅ Data pour iOS PWA + service worker
       data: {
+        title: '🛒 Nouvelle commande AValide',
+        body: orderId ? `Commande #${orderId} reçue` : 'Un client vient de passer une commande',
         orderId: orderId ? String(orderId) : '',
       },
     });
 
-    console.log(
-      `[FCM] Succès: ${response.successCount}, Échecs: ${response.failureCount}`
-    );
+    console.log(`[FCM] Envoyé: ${response.successCount}, Échec: ${response.failureCount}`);
 
     return res.status(200).json({
       success: true,
