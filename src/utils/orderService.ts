@@ -89,7 +89,6 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 
   if (error || !data) return [];
 
-  // Filtrer uniquement les items appartenant au vendeur
   return data
     .map((order: any) => ({
       ...order,
@@ -137,9 +136,9 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
     // 1️⃣ Déterminer le seller_id principal (premier vendeur)
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
-    const mainSellerId = sellers[0];
+    const mainSellerId = sellers[0]; // ✅ seller principal pour orders.seller_id
 
-    // 2️⃣ Créer la commande avec seller_id principal
+    // 2️⃣ Créer la commande avec seller_id
     const { data: order, error } = await supabase
       .from('orders')
       .insert({ ...orderMain, seller_id: mainSellerId })
@@ -149,7 +148,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
     if (error || !order) throw error;
     const orderId = order.id;
 
-    // 3️⃣ Insérer les items liés à cette commande
+    // 3️⃣ Insérer les items
     await supabase.from('order_items').insert(
       order_items.map((item: any) => ({
         ...item,
@@ -157,24 +156,19 @@ export const createOrder = async (orderData: any): Promise<string> => {
       }))
     );
 
-    // 4️⃣ Envoyer une notification FCM à chaque vendeur unique
+    // 4️⃣ Boucle sur chaque vendeur unique → PUSH NOTIFICATIONS
     for (const sellerId of sellers) {
       try {
-        const { data: tokens, error: tokenError } = await supabase
+        const { data: tokens } = await supabase
           .from('user_tokens')
           .select('fcm_token')
           .eq('seller_id', sellerId);
-
-        if (tokenError) throw tokenError;
 
         if (tokens?.length) {
           await fetch('/api/send-notification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tokens: tokens.map((t: any) => t.fcm_token),
-              orderId,
-            }),
+            body: JSON.stringify({ sellerId }),
           });
         }
       } catch (e) {
