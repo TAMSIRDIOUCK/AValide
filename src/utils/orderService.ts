@@ -55,7 +55,9 @@ function mapOrderFields(order: any): Order {
 //////////////////////////////////////////////////////////////
 // 🟢 Commandes vendeur
 //////////////////////////////////////////////////////////////
-export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
+export async function getOrdersBySeller(
+  sellerId: string
+): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
@@ -101,13 +103,13 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH (LOGIQUE CORRIGÉE)
+// 🔵 Création commande (SANS PUSH FRONT)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
-    if (!order_items?.length) {
+    if (!order_items || order_items.length === 0) {
       throw new Error('order_items vide');
     }
 
@@ -118,7 +120,10 @@ export const createOrder = async (orderData: any): Promise<string> => {
     // 1️⃣ Créer la commande
     const { data: order, error } = await supabase
       .from('orders')
-      .insert({ ...orderMain, seller_id: mainSellerId })
+      .insert({
+        ...orderMain,
+        seller_id: mainSellerId,
+      })
       .select()
       .single();
 
@@ -133,20 +138,13 @@ export const createOrder = async (orderData: any): Promise<string> => {
       seller_id: item.seller_id,
     }));
 
-    await supabase.from('order_items').insert(itemsToInsert);
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(itemsToInsert);
 
-    // 3️⃣ 🔔 NOTIFICATION (ON PASSE sellerId → API)
-    for (const sellerId of sellers) {
-      await fetch('/api/send-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sellerId,   // ✅ PAS LES TOKENS
-          orderId,
-        }),
-      });
-    }
+    if (itemsError) throw itemsError;
 
+    // ✅ FIN : la notification sera déclenchée côté serveur
     return orderId;
 
   } catch (err) {
