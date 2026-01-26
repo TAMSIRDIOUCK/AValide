@@ -55,9 +55,7 @@ function mapOrderFields(order: any): Order {
 //////////////////////////////////////////////////////////////
 // 🟢 Commandes vendeur
 //////////////////////////////////////////////////////////////
-export async function getOrdersBySeller(
-  sellerId: string
-): Promise<Order[]> {
+export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
@@ -91,6 +89,7 @@ export async function getOrdersBySeller(
 
   if (error || !data) return [];
 
+  // Filtrer uniquement les items appartenant au vendeur
   return data
     .map((order: any) => ({
       ...order,
@@ -103,48 +102,86 @@ export async function getOrdersBySeller(
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande (SANS PUSH FRONT)
+// 🔵 Items vendeur
+//////////////////////////////////////////////////////////////
+export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select('*')
+    .eq('seller_id', sellerId)
+    .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map((item: any) => {
+    const variant = tryParseVariant(item.selected_variant);
+    return {
+      ...item,
+      variantSize: variant.size ?? '',
+      variantColor: variant.color ?? '',
+      variantPrice: variant.price ?? null,
+    };
+  });
+}
+
+//////////////////////////////////////////////////////////////
+// 🔵 Création commande + PUSH (sans email)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
-    if (!order_items || order_items.length === 0) {
-      throw new Error('order_items vide');
+    if (!order_items?.length) {
+      throw new Error("order_items vide");
     }
 
-    // 🔹 vendeurs concernés
+    // 1️⃣ Déterminer le seller_id principal (premier vendeur)
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
     const mainSellerId = sellers[0];
 
-    // 1️⃣ Créer la commande
+    // 2️⃣ Créer la commande avec seller_id principal
     const { data: order, error } = await supabase
       .from('orders')
-      .insert({
-        ...orderMain,
-        seller_id: mainSellerId,
-      })
+      .insert({ ...orderMain, seller_id: mainSellerId })
       .select()
       .single();
 
     if (error || !order) throw error;
-
     const orderId = order.id;
 
-    // 2️⃣ Créer les items
-    const itemsToInsert = order_items.map((item: any) => ({
-      ...item,
-      order_id: orderId,
-      seller_id: item.seller_id,
-    }));
+    // 3️⃣ Insérer les items liés à cette commande
+    await supabase.from('order_items').insert(
+      order_items.map((item: any) => ({
+        ...item,
+        order_id: orderId,
+      }))
+    );
 
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(itemsToInsert);
+    // 4️⃣ Envoyer une notification FCM à chaque vendeur unique
+    for (const sellerId of sellers) {
+      try {
+        const { data: tokens, error: tokenError } = await supabase
+          .from('user_tokens')
+          .select('fcm_token')
+          .eq('seller_id', sellerId);
 
-    if (itemsError) throw itemsError;
+        if (tokenError) throw tokenError;
 
-    // ✅ FIN : la notification sera déclenchée côté serveur
+        if (tokens?.length) {
+          await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tokens: tokens.map((t: any) => t.fcm_token),
+              orderId,
+            }),
+          });
+        }
+      } catch (e) {
+        console.warn('Push error:', e);
+      }
+    }
+
     return orderId;
 
   } catch (err) {
