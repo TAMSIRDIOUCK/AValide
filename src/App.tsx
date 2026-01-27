@@ -7,7 +7,7 @@ import {
   requestNotificationPermission,
   getFcmToken,
   listenForegroundNotifications
-} from "./lib/firebaseMessaging"; // Assurez-vous que ces 2 fonctions sont exportées
+} from "./lib/firebaseMessaging";
 
 // --- Components & Pages ---
 import Header from "./components/layout/Header";
@@ -59,24 +59,17 @@ const App: React.FC = () => {
   useEffect(() => {
     const initFirebase = async () => {
       try {
-        // 1️⃣ Enregistrer le service worker
         await registerServiceWorker();
 
-        // 2️⃣ Demander la permission notifications (Android / Desktop)
         const permissionGranted = await requestNotificationPermission();
         if (!permissionGranted) {
           console.warn("[FCM] L'utilisateur n'a pas autorisé les notifications");
           return;
         }
 
-        // 3️⃣ Récupérer le token FCM et envoyer au serveur
         const token = await getFcmToken();
-        if (token) {
-          console.log("[FCM] Token récupéré :", token);
-          // Ici tu peux l'envoyer à ton backend
-        }
+        if (token) console.log("[FCM] Token récupéré :", token);
 
-        // 4️⃣ Écoute notifications en premier plan (Android / Desktop)
         listenForegroundNotifications();
       } catch (err) {
         console.error("[FCM] Erreur initialisation Firebase :", err);
@@ -98,7 +91,6 @@ const App: React.FC = () => {
       <Header />
 
       <Routes>
-        {/* Pages publiques */}
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -111,15 +103,10 @@ const App: React.FC = () => {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/services/:id" element={<ServiceDetailPage />} />
-
-        {/* Détail produit */}
         <Route path="/products/:id" element={<ProductDetailPageWrapper />} />
-
-        {/* Achat accessible sans connexion */}
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/order-success" element={<OrderSuccessPage />} />
 
-        {/* Pages nécessitant une connexion */}
         <Route
           path="/orders"
           element={
@@ -161,7 +148,6 @@ const App: React.FC = () => {
           }
         />
 
-        {/* Redirection si route non trouvée */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
