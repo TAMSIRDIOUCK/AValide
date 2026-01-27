@@ -31,9 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (sellerId) {
       query = query.eq('seller_id', sellerId);
     }
-
     const { data, error } = await query;
-
     if (error) {
       console.error('❌ Supabase error:', error);
       return res.status(500).json({ error: 'Erreur récupération tokens' });
@@ -41,7 +39,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 🔹 Extraire uniquement les tokens valides
     const tokens = data?.map(t => t.fcm_token).filter(Boolean);
-
     if (!tokens || tokens.length === 0) {
       return res.status(200).json({ message: 'Aucun token FCM' });
     }

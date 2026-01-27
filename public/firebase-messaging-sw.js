@@ -16,7 +16,6 @@ const messaging = firebase.messaging();
 // 🔔 NOTIFICATIONS BACKGROUND (OBLIGATOIRE POUR iOS)
 messaging.onBackgroundMessage((payload) => {
   console.log("[SW] Payload reçu:", payload);
-
   const title = payload.data?.title || "Nouvelle commande AValide";
   const options = {
     body: payload.data?.body || "Vous avez une nouvelle commande",
@@ -24,14 +23,12 @@ messaging.onBackgroundMessage((payload) => {
     badge: "/videos/IMG_1696.jpg",
     data: { url: "/orders" },
   };
-
   self.registration.showNotification(title, options);
 });
 
 // 👉 Action au clic
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-
   event.waitUntil(
     clients.openWindow(event.notification.data.url)
   );
