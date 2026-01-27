@@ -116,9 +116,42 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
+// 🔵 ENVOYER PUSH À TOUS LES APPAREILS DU VENDEUR
+//////////////////////////////////////////////////////////////
+async function sendPushToSeller(sellerId: string, orderId: string) {
+  try {
+    const { data: tokens } = await supabase
+      .from('user_tokens')
+      .select('fcm_token')
+      .eq('seller_id', sellerId);
+
+    if (!tokens || tokens.length === 0) return;
+
+    const tokenList = tokens.map((t: { fcm_token: string }) => t.fcm_token);
+
+    await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tokens: tokenList,
+        title: '🛒 Nouvelle commande',
+        body: `Vous avez reçu une nouvelle commande #${orderId}`,
+        url: '/orders',
+        orderId,
+      }),
+    });
+  } catch (err) {
+    console.error('❌ sendPushToSeller FAILED:', err);
+  }
+}
+
+//////////////////////////////////////////////////////////////
 // 🔵 CRÉATION COMMANDE + PUSH AUTOMATIQUE + ENREGISTREMENT TOKEN
 //////////////////////////////////////////////////////////////
-export const createOrder = async (orderData: any, fcmInfo?: { token: string; device: string }): Promise<string> => {
+export const createOrder = async (
+  orderData: any,
+  fcmInfo?: { token: string; device: string }
+): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
@@ -161,22 +194,32 @@ export const createOrder = async (orderData: any, fcmInfo?: { token: string; dev
     if (itemsError) throw itemsError;
 
     //////////////////////////////////////////////////////
-    // 3️⃣ Enregistrement du token FCM si fourni
+    // 3️⃣ Enregistrement du token FCM si fourni (multi-device)
     //////////////////////////////////////////////////////
     if (fcmInfo) {
       for (const sellerId of sellers) {
         try {
-          // 🔹 On insère toujours un nouvel enregistrement
-          const { error: tokenError } = await supabase
+          // ✅ Vérifie si token existe déjà pour ce vendeur + device
+          const { data: existing } = await supabase
             .from('user_tokens')
-            .insert({
-              seller_id: sellerId,
-              fcm_token: fcmInfo.token,
-              device: fcmInfo.device,
-            });
+            .select('id')
+            .eq('seller_id', sellerId)
+            .eq('fcm_token', fcmInfo.token)
+            .eq('device', fcmInfo.device)
+            .single();
 
-          if (tokenError) console.error('❌ Erreur insert token:', tokenError);
-          else console.log('✅ Token FCM inséré avec device pour le vendeur:', sellerId);
+          if (!existing) {
+            const { error: tokenError } = await supabase
+              .from('user_tokens')
+              .insert({
+                seller_id: sellerId,
+                fcm_token: fcmInfo.token,
+                device: fcmInfo.device,
+              });
+
+            if (tokenError) console.error('❌ Erreur insert token:', tokenError);
+            else console.log('✅ Token FCM inséré pour le vendeur:', sellerId);
+          }
         } catch (err) {
           console.error('❌ Exception insert token:', err);
         }
@@ -187,26 +230,7 @@ export const createOrder = async (orderData: any, fcmInfo?: { token: string; dev
     // 4️⃣ PUSH NOTIFICATION À CHAQUE VENDEUR
     //////////////////////////////////////////////////////
     for (const sellerId of sellers) {
-      try {
-        const { data: tokens } = await supabase
-          .from('user_tokens')
-          .select('fcm_token')
-          .eq('seller_id', sellerId);
-
-        if (!tokens || tokens.length === 0) continue;
-
-        await fetch('/api/send-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tokens: tokens.map((t: { fcm_token: string }) => t.fcm_token),
-            title: '🛒 Nouvelle commande',
-            body: `Vous avez reçu une nouvelle commande #${orderId}`,
-          }),
-        });
-      } catch (pushError) {
-        console.warn('⚠️ Push error:', pushError);
-      }
+      await sendPushToSeller(sellerId, orderId);
     }
 
     return orderId;
