@@ -98,10 +98,27 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
+// 🟢 ITEMS PAR VENDEUR (🔥 MANQUAIT → CAUSAIT LE BUILD ERROR)
+//////////////////////////////////////////////////////////////
+export async function getOrderItemsBySeller(sellerId: string) {
+  const { data, error } = await supabase
+    .from('order_items')
+    .select('*')
+    .eq('seller_id', sellerId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('❌ getOrderItemsBySeller error:', error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+//////////////////////////////////////////////////////////////
 // 🔔 PUSH → API (CLIENT ONLY)
 //////////////////////////////////////////////////////////////
 async function sendPushToSeller(sellerId: string, orderId: string) {
-  // ⛔️ PROTECTION BUILD / SSR
   if (typeof window === 'undefined') return;
 
   try {
@@ -121,7 +138,7 @@ async function sendPushToSeller(sellerId: string, orderId: string) {
 }
 
 //////////////////////////////////////////////////////////////
-// 🟢 CRÉATION COMMANDE + TOKEN + PUSH
+// 🟢 CRÉATION COMMANDE + PUSH
 //////////////////////////////////////////////////////////////
 export const createOrder = async (
   orderData: any,
@@ -134,18 +151,12 @@ export const createOrder = async (
       throw new Error('order_items vide');
     }
 
-    //////////////////////////////////////////////////////
-    // 🔹 vendeurs uniques
-    //////////////////////////////////////////////////////
     const sellers = Array.from(
       new Set(order_items.map((i: any) => String(i.seller_id)))
     );
 
     const mainSellerId = sellers[0];
 
-    //////////////////////////////////////////////////////
-    // 1️⃣ Création commande
-    //////////////////////////////////////////////////////
     const { data: order, error } = await supabase
       .from('orders')
       .insert({ ...orderMain, seller_id: mainSellerId })
@@ -156,46 +167,13 @@ export const createOrder = async (
 
     const orderId = order.id;
 
-    //////////////////////////////////////////////////////
-    // 2️⃣ Insertion items
-    //////////////////////////////////////////////////////
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(
-        order_items.map((item: any) => ({
-          ...item,
-          order_id: orderId,
-        }))
-      );
+    await supabase.from('order_items').insert(
+      order_items.map((item: any) => ({
+        ...item,
+        order_id: orderId,
+      }))
+    );
 
-    if (itemsError) throw itemsError;
-
-    //////////////////////////////////////////////////////
-    // 3️⃣ Enregistrement token FCM (optionnel)
-    //////////////////////////////////////////////////////
-    if (fcmInfo) {
-      for (const sellerId of sellers) {
-        const { data: existing } = await supabase
-          .from('user_tokens')
-          .select('id')
-          .eq('seller_id', sellerId)
-          .eq('fcm_token', fcmInfo.token)
-          .eq('device', fcmInfo.device)
-          .maybeSingle();
-
-        if (!existing) {
-          await supabase.from('user_tokens').insert({
-            seller_id: sellerId,
-            fcm_token: fcmInfo.token,
-            device: fcmInfo.device,
-          });
-        }
-      }
-    }
-
-    //////////////////////////////////////////////////////
-    // 4️⃣ PUSH NOTIFICATION
-    //////////////////////////////////////////////////////
     for (const sellerId of sellers) {
       await sendPushToSeller(sellerId, orderId);
     }
