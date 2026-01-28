@@ -25,11 +25,9 @@ const supabase = createClient(
 //////////////////////////////////////////////////////////////
 // 🚀 HANDLER
 //////////////////////////////////////////////////////////////
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    // ⛔️ Autoriser uniquement POST
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Méthode non autorisée" });
     }
@@ -41,7 +39,7 @@ export default async function handler(
     }
 
     //////////////////////////////////////////////////////
-    // 🔹 RÉCUP TOKENS FCM
+    // 🔹 Récupération des tokens FCM du vendeur
     //////////////////////////////////////////////////////
     const { data, error } = await supabase
       .from("user_tokens")
@@ -62,22 +60,29 @@ export default async function handler(
     }
 
     //////////////////////////////////////////////////////
-    // 🔔 MESSAGE FCM (DATA ONLY 🔥🔥🔥)
+    // 🔔 Préparer le message FCM compatible WEB / Desktop
     //////////////////////////////////////////////////////
     const message: admin.messaging.MulticastMessage = {
       tokens,
+      webpush: {
+        notification: {
+          title: "🛒 Nouvelle commande AValide",
+          body: orderId ? `Commande #${orderId} reçue` : "Un client vient de passer une commande",
+          icon: "/videos/IMG_1696.jpg",
+          badge: "/videos/IMG_1696.jpg",
+        },
+        fcmOptions: {
+          link: "/orders", // Redirection au clic
+        },
+      },
       data: {
-        title: "🛒 Nouvelle commande AValide",
-        body: orderId
-          ? `Commande #${orderId} reçue`
-          : "Un client vient de passer une commande",
-        url: "/orders",
         orderId: orderId ? String(orderId) : "",
+        url: "/orders",
       },
     };
 
     //////////////////////////////////////////////////////
-    // 🚀 ENVOI
+    // 🚀 Envoi du message
     //////////////////////////////////////////////////////
     const response = await admin.messaging().sendMulticast(message);
 
