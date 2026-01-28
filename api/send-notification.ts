@@ -2,9 +2,9 @@ import * as admin from "firebase-admin";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-//////////////////////////////////////////////////////////////
+// =====================================================
 // 🔥 INIT FIREBASE ADMIN (SERVER ONLY)
-//////////////////////////////////////////////////////////////
+// =====================================================
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -22,58 +22,53 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
 );
 
-//////////////////////////////////////////////////////////////
+// =====================================================
 // 🚀 HANDLER
-//////////////////////////////////////////////////////////////
+// =====================================================
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // ⛔️ Autoriser uniquement POST
+    // 🔒 Autoriser uniquement POST
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Méthode non autorisée" });
     }
 
     const { sellerId, orderId } = req.body || {};
+    if (!sellerId) return res.status(400).json({ error: "sellerId manquant" });
 
-    if (!sellerId) {
-      return res.status(400).json({ error: "sellerId manquant" });
-    }
+    console.log("📌 BODY reçu :", req.body);
 
-    //////////////////////////////////////////////////////
-    // 🔹 Récupération des tokens FCM du vendeur
-    //////////////////////////////////////////////////////
+    // =====================================================
+    // 🔹 Récupération tokens FCM depuis Supabase
+    // =====================================================
     const { data, error } = await supabase
       .from("user_tokens")
       .select("fcm_token")
       .eq("seller_id", sellerId);
 
     if (error) {
-      console.error("❌ Supabase:", error);
-      return res.status(500).json({ error: "Erreur Supabase" });
+      console.error("❌ Supabase error:", error);
+      return res.status(500).json({ error: "Erreur Supabase", details: error });
     }
 
-    const tokens = (data || [])
-      .map((t: any) => t.fcm_token)
-      .filter(Boolean);
+    const tokens = (data || []).map((t: any) => t.fcm_token).filter(Boolean);
 
     if (!tokens.length) {
+      console.log("⚠️ Aucun token FCM trouvé pour ce sellerId");
       return res.status(200).json({ message: "Aucun token FCM" });
     }
 
-    //////////////////////////////////////////////////////
-    // 🔔 Préparer le message FCM compatible WEB / Desktop
-    //////////////////////////////////////////////////////
+    console.log("📌 Tokens FCM à envoyer :", tokens);
+
+    // =====================================================
+    // 🔔 Message FCM
+    // =====================================================
     const message: admin.messaging.MulticastMessage = {
       tokens,
-      webpush: {
-        notification: {
-          title: "🛒 Nouvelle commande AValide",
-          body: orderId ? `Commande #${orderId} reçue` : "Un client vient de passer une commande",
-          icon: "/videos/IMG_1696.jpg",
-          badge: "/videos/IMG_1696.jpg",
-        },
-        fcmOptions: {
-          link: "/orders", // Redirection au clic
-        },
+      notification: {
+        title: "🛒 Nouvelle commande AValide",
+        body: orderId
+          ? `Commande #${orderId} reçue`
+          : "Un client vient de passer une commande",
       },
       data: {
         orderId: orderId ? String(orderId) : "",
@@ -81,13 +76,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
-    //////////////////////////////////////////////////////
-    // 🚀 Envoi du message
-    //////////////////////////////////////////////////////
-    const response = await admin.messaging().sendMulticast(message);
+    // =====================================================
+    // 🚀 Envoi via Firebase Admin
+    // =====================================================
+    let response;
+    try {
+      response = await admin.messaging().sendMulticast(message);
+      console.log("✅ FCM envoyé :", response);
+    } catch (err) {
+      console.error("🔥 Erreur envoi FCM :", err);
+      return res.status(500).json({ error: "Erreur Firebase Admin", details: err });
+    }
 
-    console.log("✅ FCM envoyé:", response);
-
+    // =====================================================
+    // ✅ Réponse
+    // =====================================================
     return res.status(200).json({
       success: true,
       sent: response.successCount,
@@ -95,6 +98,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error("🔥 SERVER ERROR:", err);
-    return res.status(500).json({ error: "Erreur serveur" });
+    return res.status(500).json({ error: "Erreur serveur", details: err });
   }
 }
