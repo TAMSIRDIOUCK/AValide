@@ -16,7 +16,13 @@ if (!admin.apps.length) {
   });
 }
 
-// 🔐 Supabase admin
+// =====================================================
+// 🔐 INIT SUPABASE ADMIN
+// =====================================================
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error("❌ Supabase env variables manquantes !");
+}
+
 const supabase = createClient( 
   "https://netgmadtongdspojqaue.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
@@ -60,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log("📌 Tokens FCM à envoyer :", tokens);
 
     // =====================================================
-    // 🔔 Message FCM
+    // 🔔 Message FCM (Notification + Data)
     // =====================================================
     const message: admin.messaging.MulticastMessage = {
       tokens,
@@ -83,9 +89,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       response = await admin.messaging().sendMulticast(message);
       console.log("✅ FCM envoyé :", response);
-    } catch (err) {
+    } catch (err: any) {
       console.error("🔥 Erreur envoi FCM :", err);
-      return res.status(500).json({ error: "Erreur Firebase Admin", details: err });
+      return res.status(500).json({ error: "Erreur Firebase Admin", details: err.message || err });
     }
 
     // =====================================================
@@ -96,8 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sent: response.successCount,
       failed: response.failureCount,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("🔥 SERVER ERROR:", err);
-    return res.status(500).json({ error: "Erreur serveur", details: err });
+    return res.status(500).json({ error: "Erreur serveur", details: err.message || err });
   }
 }
