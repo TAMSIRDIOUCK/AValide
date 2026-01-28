@@ -98,23 +98,21 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 PUSH NOTIFICATION → API SERVER
+// 🔔 PUSH → API (CLIENT ONLY)
 //////////////////////////////////////////////////////////////
 async function sendPushToSeller(sellerId: string, orderId: string) {
+  // ⛔️ PROTECTION BUILD / SSR
+  if (typeof window === 'undefined') return;
+
   try {
     const res = await fetch('/api/send-notification', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        sellerId, // 🔥 OBLIGATOIRE
-        orderId,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sellerId, orderId }),
     });
 
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.text();
       console.error('❌ Push API error:', err);
     }
   } catch (err) {
@@ -123,7 +121,7 @@ async function sendPushToSeller(sellerId: string, orderId: string) {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 CRÉATION COMMANDE + PUSH AUTOMATIQUE
+// 🟢 CRÉATION COMMANDE + TOKEN + PUSH
 //////////////////////////////////////////////////////////////
 export const createOrder = async (
   orderData: any,
@@ -139,7 +137,7 @@ export const createOrder = async (
     //////////////////////////////////////////////////////
     // 🔹 vendeurs uniques
     //////////////////////////////////////////////////////
-    const sellers: string[] = Array.from(
+    const sellers = Array.from(
       new Set(order_items.map((i: any) => String(i.seller_id)))
     );
 
@@ -156,24 +154,24 @@ export const createOrder = async (
 
     if (error || !order) throw error;
 
-    const orderId: string = order.id;
+    const orderId = order.id;
 
     //////////////////////////////////////////////////////
-    // 2️⃣ Insertion des items
+    // 2️⃣ Insertion items
     //////////////////////////////////////////////////////
-    const itemsToInsert = order_items.map((item: any) => ({
-      ...item,
-      order_id: orderId,
-    }));
-
     const { error: itemsError } = await supabase
       .from('order_items')
-      .insert(itemsToInsert);
+      .insert(
+        order_items.map((item: any) => ({
+          ...item,
+          order_id: orderId,
+        }))
+      );
 
     if (itemsError) throw itemsError;
 
     //////////////////////////////////////////////////////
-    // 3️⃣ Enregistrer token FCM (optionnel)
+    // 3️⃣ Enregistrement token FCM (optionnel)
     //////////////////////////////////////////////////////
     if (fcmInfo) {
       for (const sellerId of sellers) {
@@ -196,7 +194,7 @@ export const createOrder = async (
     }
 
     //////////////////////////////////////////////////////
-    // 4️⃣ PUSH À CHAQUE VENDEUR
+    // 4️⃣ PUSH NOTIFICATION
     //////////////////////////////////////////////////////
     for (const sellerId of sellers) {
       await sendPushToSeller(sellerId, orderId);
