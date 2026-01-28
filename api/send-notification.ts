@@ -2,7 +2,7 @@ import admin from "firebase-admin";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-// ⚡ Initialisation Firebase Admin (si pas déjà initialisé)
+// ✅ Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -22,25 +22,40 @@ const supabase = createClient(
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const { sellerId, orderId } = req.body;
+    // 🔒 Autoriser uniquement POST
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Méthode non autorisée" });
+    }
 
-    if (!sellerId) return res.status(400).json({ error: "sellerId requis" });
+    console.log("📦 BODY REÇU :", req.body);
 
-    // 🔹 Récupérer tous les tokens FCM du vendeur
+    const { sellerId, orderId } = req.body || {};
+
+    if (!sellerId) {
+      return res.status(400).json({ error: "sellerId manquant" });
+    }
+
+    // 🔹 Récupération des tokens
     const { data, error } = await supabase
       .from("user_tokens")
       .select("fcm_token")
       .eq("seller_id", sellerId);
 
-    if (error) return res.status(500).json({ error: "Erreur récupération tokens" });
+    if (error) {
+      console.error("❌ Supabase error:", error);
+      return res.status(500).json({ error: "Erreur Supabase" });
+    }
 
-    const tokens: string[] = data?.map((t: any) => t.fcm_token).filter(Boolean) || [];
+    const tokens = (data || [])
+      .map((t: any) => t.fcm_token)
+      .filter(Boolean);
 
-    if (tokens.length === 0)
-      return res.status(200).json({ message: "Aucun token FCM trouvé" });
+    if (!tokens.length) {
+      return res.status(200).json({ message: "Aucun token FCM" });
+    }
 
-    // 🔹 Préparer le message (TS ne se plaint plus car on utilise 'any')
-    const message: any = {
+    // 🔔 Message FCM
+    const message = {
       tokens,
       notification: {
         title: "🛒 Nouvelle commande AValide",
@@ -53,12 +68,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     };
 
-    // 🔹 Envoi multicast via Firebase Admin
+    // 🚀 Envoi Firebase
     const response = await admin.messaging().sendMulticast(message);
 
-    console.log(
-      `[FCM] Envoyé: ${response.successCount}, Échec: ${response.failureCount}`
-    );
+    console.log("✅ FCM:", response);
 
     return res.status(200).json({
       success: true,
@@ -66,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       failed: response.failureCount,
     });
   } catch (err) {
-    console.error("❌ Notification error:", err);
+    console.error("🔥 SERVER ERROR:", err);
     return res.status(500).json({ error: "Erreur serveur" });
   }
 }
