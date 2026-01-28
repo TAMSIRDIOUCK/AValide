@@ -98,55 +98,32 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 ITEMS PAR VENDEUR
-//////////////////////////////////////////////////////////////
-export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
-  const { data, error } = await supabase
-    .from('order_items')
-    .select('*')
-    .eq('seller_id', sellerId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('❌ getOrderItemsBySeller error:', error);
-    return [];
-  }
-
-  return data ?? [];
-}
-
-//////////////////////////////////////////////////////////////
-// 🔵 ENVOYER PUSH À TOUS LES APPAREILS DU VENDEUR
+// 🔵 PUSH NOTIFICATION → API SERVER
 //////////////////////////////////////////////////////////////
 async function sendPushToSeller(sellerId: string, orderId: string) {
   try {
-    const { data: tokens } = await supabase
-      .from('user_tokens')
-      .select('fcm_token')
-      .eq('seller_id', sellerId);
-
-    if (!tokens || tokens.length === 0) return;
-
-    const tokenList = tokens.map((t: { fcm_token: string }) => t.fcm_token);
-
-    await fetch('/api/send-notification', {
+    const res = await fetch('/api/send-notification', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        tokens: tokenList,
-        title: '🛒 Nouvelle commande',
-        body: `Vous avez reçu une nouvelle commande #${orderId}`,
-        url: '/orders',
+        sellerId, // 🔥 OBLIGATOIRE
         orderId,
       }),
     });
+
+    if (!res.ok) {
+      const err = await res.json();
+      console.error('❌ Push API error:', err);
+    }
   } catch (err) {
     console.error('❌ sendPushToSeller FAILED:', err);
   }
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 CRÉATION COMMANDE + PUSH AUTOMATIQUE + ENREGISTREMENT TOKEN
+// 🔵 CRÉATION COMMANDE + PUSH AUTOMATIQUE
 //////////////////////////////////////////////////////////////
 export const createOrder = async (
   orderData: any,
@@ -165,10 +142,11 @@ export const createOrder = async (
     const sellers: string[] = Array.from(
       new Set(order_items.map((i: any) => String(i.seller_id)))
     );
-    const mainSellerId: string = sellers[0];
+
+    const mainSellerId = sellers[0];
 
     //////////////////////////////////////////////////////
-    // 1️⃣ Création de la commande
+    // 1️⃣ Création commande
     //////////////////////////////////////////////////////
     const { data: order, error } = await supabase
       .from('orders')
@@ -177,6 +155,7 @@ export const createOrder = async (
       .single();
 
     if (error || !order) throw error;
+
     const orderId: string = order.id;
 
     //////////////////////////////////////////////////////
@@ -194,40 +173,30 @@ export const createOrder = async (
     if (itemsError) throw itemsError;
 
     //////////////////////////////////////////////////////
-    // 3️⃣ Enregistrement du token FCM si fourni (multi-device)
+    // 3️⃣ Enregistrer token FCM (optionnel)
     //////////////////////////////////////////////////////
     if (fcmInfo) {
       for (const sellerId of sellers) {
-        try {
-          // ✅ Vérifie si token existe déjà pour ce vendeur + device
-          const { data: existing } = await supabase
-            .from('user_tokens')
-            .select('id')
-            .eq('seller_id', sellerId)
-            .eq('fcm_token', fcmInfo.token)
-            .eq('device', fcmInfo.device)
-            .single();
+        const { data: existing } = await supabase
+          .from('user_tokens')
+          .select('id')
+          .eq('seller_id', sellerId)
+          .eq('fcm_token', fcmInfo.token)
+          .eq('device', fcmInfo.device)
+          .maybeSingle();
 
-          if (!existing) {
-            const { error: tokenError } = await supabase
-              .from('user_tokens')
-              .insert({
-                seller_id: sellerId,
-                fcm_token: fcmInfo.token,
-                device: fcmInfo.device,
-              });
-
-            if (tokenError) console.error('❌ Erreur insert token:', tokenError);
-            else console.log('✅ Token FCM inséré pour le vendeur:', sellerId);
-          }
-        } catch (err) {
-          console.error('❌ Exception insert token:', err);
+        if (!existing) {
+          await supabase.from('user_tokens').insert({
+            seller_id: sellerId,
+            fcm_token: fcmInfo.token,
+            device: fcmInfo.device,
+          });
         }
       }
     }
 
     //////////////////////////////////////////////////////
-    // 4️⃣ PUSH NOTIFICATION À CHAQUE VENDEUR
+    // 4️⃣ PUSH À CHAQUE VENDEUR
     //////////////////////////////////////////////////////
     for (const sellerId of sellers) {
       await sendPushToSeller(sellerId, orderId);
