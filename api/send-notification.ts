@@ -7,6 +7,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 // =====================================================
 if (!admin.apps.length) {
   try {
+    console.log("🔹 Initialisation de Firebase Admin...");
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: "avalide-push",
@@ -50,46 +51,58 @@ gagpuC0D3COjV0yaho1ICMHz
 // =====================================================
 // 🔐 INIT SUPABASE ADMIN
 // =====================================================
+console.log("🔹 Initialisation de Supabase Admin...");
 const supabase = createClient(
   "https://netgmadtongdspojqaue.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
 );
+console.log("✅ Supabase Admin initialisé");
 
 // =====================================================
 // 🚀 HANDLER
 // =====================================================
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    console.log("📌 Requête reçue :", req.method);
+
     if (req.method !== "POST") {
+      console.warn("⚠️ Méthode non autorisée :", req.method);
       return res.status(405).json({ error: "Méthode non autorisée" });
     }
 
     const { sellerId, orderId } = req.body || {};
-    if (!sellerId) return res.status(400).json({ error: "sellerId manquant" });
+    console.log("📌 Body :", req.body);
 
-    console.log("📌 BODY reçu :", req.body);
+    if (!sellerId) {
+      console.warn("⚠️ sellerId manquant dans le body !");
+      return res.status(400).json({ error: "sellerId manquant" });
+    }
 
-    // Récup tokens FCM depuis Supabase
+    // =====================================================
+    // 🔹 Récup tokens FCM depuis Supabase
+    // =====================================================
+    console.log(`🔹 Récupération des tokens FCM pour sellerId: ${sellerId}...`);
     const { data, error } = await supabase
       .from("user_tokens")
       .select("fcm_token")
       .eq("seller_id", sellerId);
 
     if (error) {
-      console.error("❌ Supabase error:", error);
+      console.error("❌ Erreur Supabase :", error);
       return res.status(500).json({ error: "Erreur Supabase", details: error });
     }
 
     const tokens = (data || []).map((t: any) => t.fcm_token).filter(Boolean);
+    console.log("📌 Tokens récupérés :", tokens);
 
     if (!tokens.length) {
-      console.log("⚠️ Aucun token FCM trouvé pour ce sellerId");
+      console.warn("⚠️ Aucun token FCM trouvé pour ce sellerId");
       return res.status(200).json({ message: "Aucun token FCM" });
     }
 
-    console.log("📌 Tokens:", tokens);
-
-    // Préparer message FCM
+    // =====================================================
+    // 🔔 Préparer message FCM
+    // =====================================================
     const message: admin.messaging.MulticastMessage = {
       tokens,
       notification: {
@@ -103,12 +116,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         url: "/orders",
       },
     };
+    console.log("📌 Message FCM prêt à être envoyé :", message);
 
-    console.log("📌 Message FCM ready to send:", message);
-
-    // Envoyer notification
+    // =====================================================
+    // 🚀 Envoyer notification
+    // =====================================================
     let response;
     try {
+      console.log("🔹 Envoi du message FCM...");
       response = await admin.messaging().sendMulticast(message);
       console.log("✅ FCM envoyé :", response);
     } catch (err) {
@@ -116,13 +131,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: "Erreur Firebase Admin", details: err });
     }
 
+    // =====================================================
+    // ✅ Réponse
+    // =====================================================
+    console.log(`📌 Résultat : ${response.successCount} réussis, ${response.failureCount} échoués`);
     return res.status(200).json({
       success: true,
       sent: response.successCount,
       failed: response.failureCount,
     });
   } catch (err) {
-    console.error("🔥 SERVER ERROR:", err);
+    console.error("🔥 ERREUR SERVEUR :", err);
     return res.status(500).json({ error: "Erreur serveur", details: err });
   }
 }
