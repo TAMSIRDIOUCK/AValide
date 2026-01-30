@@ -1,3 +1,7 @@
+export const config = {
+  runtime: "nodejs",
+};
+
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import * as admin from "firebase-admin";
 import { createClient } from "@supabase/supabase-js";
@@ -8,12 +12,18 @@ import { createClient } from "@supabase/supabase-js";
 let firebaseReady = false;
 
 try {
+  console.log("ENV CHECK", {
+    projectId: !!process.env.FIREBASE_PROJECT_ID,
+    clientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+  });
+
   if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        projectId: process.env.FIREBASE_PROJECT_ID!,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, "\n"),
       }),
     });
   }
@@ -28,9 +38,10 @@ try {
    🔐 SUPABASE
 ===================================================== */
 const supabase = createClient(
-  "https://netgmadtongdspojqaue.supabase.co",
+ "https://netgmadtongdspojqaue.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
 );
+
 
 /* =====================================================
    🚀 HANDLER
