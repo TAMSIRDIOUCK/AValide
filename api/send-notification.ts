@@ -1,8 +1,10 @@
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 import { createClient } from "@supabase/supabase-js";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-/// 🔹 Initialisation Firebase Admin (clé privée depuis les variables d'environnement)
+//////////////////////////////////////////////////////////////
+// 🔹 Firebase Admin (SAFE INIT)
+//////////////////////////////////////////////////////////////
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -20,67 +22,76 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
 );
 
-// 🔹 API Handler
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  try {
-    const { sellerId } = req.body;
+//////////////////////////////////////////////////////////////
+// 🔹 API HANDLER
+//////////////////////////////////////////////////////////////
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Méthode non autorisée" });
+  }
 
-    let query = supabase.from("user_tokens").select("fcm_token");
-    if (sellerId) {
-      query = query.eq("seller_id", sellerId);
+  try {
+    const { sellerId, orderId } = req.body;
+
+    if (!sellerId) {
+      return res.status(400).json({ error: "sellerId manquant" });
     }
 
-    const { data, error } = await query;
+    //////////////////////////////////////////////////////////////
+    // 🔎 Récupération tokens FCM
+    //////////////////////////////////////////////////////////////
+    const { data, error } = await supabase
+      .from("user_tokens")
+      .select("fcm_token")
+      .eq("seller_id", sellerId);
 
     if (error) {
       console.error("❌ Supabase error:", error);
-      return res.status(500).json({ error: "Erreur récupération tokens" });
+      return res.status(500).json({ error: "Erreur Supabase" });
     }
 
-    const tokens = data?.map(t => t.fcm_token).filter(Boolean);
+    const tokens = (data ?? [])
+      .map((t) => t.fcm_token)
+      .filter(Boolean);
 
-    if (!tokens || tokens.length === 0) {
-      return res.status(200).json({ message: "Aucun token FCM" });
+    if (tokens.length === 0) {
+      console.log("⚠️ Aucun token FCM trouvé");
+      return res.status(200).json({ message: "Aucun token" });
     }
 
-    // ✅ DATA ONLY (OBLIGATOIRE)
-    const message = {
+    //////////////////////////////////////////////////////////////
+    // 🔔 Envoi PUSH Firebase
+    //////////////////////////////////////////////////////////////
+    const response = await admin.messaging().sendMulticast({
       tokens,
-      data: {
+      notification: {
         title: "🛒 Nouvelle commande",
-        body: "Un client vient de passer une commande",
+        body: orderId
+          ? `Commande #${orderId} reçue`
+          : "Nouvelle commande reçue",
       },
-    };
+      data: {
+        orderId: orderId ? String(orderId) : "",
+        url: "/orders",
+      },
+    });
 
-    try {
-      const response = await admin.messaging().sendMulticast(message);
-      console.log("✅ Push notification sent: ", response);
+    console.log("✅ PUSH OK", {
+      success: response.successCount,
+      failed: response.failureCount,
+    });
 
-      return res.status(200).json({
-        success: true,
-        sent: response.successCount,
-        failed: response.failureCount,
-      });
-    } catch (pushError) {
-      let errorMessage = "Unknown error";
-      if (pushError instanceof Error) {
-        errorMessage = pushError.message;
-      } else if (
-        typeof pushError === "object" &&
-        pushError !== null &&
-        Object.prototype.hasOwnProperty.call(pushError, "message")
-      ) {
-        errorMessage = String((pushError as Record<string, unknown>).message);
-      }
-      console.error("❌ Push notification error: ", errorMessage);
-      return res.status(500).json({
-        error: "Push notification failed",
-        message: errorMessage,
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      sent: response.successCount,
+      failed: response.failureCount,
+    });
 
   } catch (err) {
-    console.error("❌ Notification error:", err);
+    console.error("🔥 API CRASH:", err);
     return res.status(500).json({ error: "Erreur serveur" });
   }
 }
