@@ -1,11 +1,10 @@
-// src/utils/orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
 
 //////////////////////////////////////////////////////////////
 // 🔎 Parse TEXT → JSON sécurisé
 //////////////////////////////////////////////////////////////
-function tryParseVariant(v: any) {
+function tryParseVariant(v: unknown): any {
   if (!v) return {};
   if (typeof v === 'object') return v;
   if (typeof v === 'string') {
@@ -44,9 +43,6 @@ function mapOrderFields(order: any): Order {
         variantSize: variant.size ?? '',
         variantColor: variant.color ?? '',
         variantPrice: variant.price ?? null,
-        customerName: item.customer_name ?? '',
-        customerPhone: item.customer_phone ?? '',
-        customerAddress: item.customer_address ?? '',
         status: item.status ?? 'en_attente',
       };
     }),
@@ -54,7 +50,7 @@ function mapOrderFields(order: any): Order {
 }
 
 //////////////////////////////////////////////////////////////
-// 🟢 Commandes vendeur (page Mes commandes)
+// 🟢 COMMANDES PAR VENDEUR
 //////////////////////////////////////////////////////////////
 export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
@@ -66,6 +62,7 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       total,
       payment_method,
       status,
+      seller_id,
       customer_name,
       customer_phone,
       customer_address,
@@ -79,169 +76,111 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
         image_url,
         title,
         selected_variant,
-        customer_name,
-        customer_phone,
-        customer_address,
         status
       )
     `)
     .order('created_at', { ascending: false });
 
-  if (error || !data) return [];
+  if (error || !data) {
+    console.error('❌ getOrdersBySeller error:', error);
+    return [];
+  }
 
-  const filtered = data.map((order: any) => ({
-    ...order,
-    order_items: (order.order_items || []).filter(
-      (item: any) => item.seller_id === sellerId
-    ),
-  }));
-
-  return filtered
+  return data
+    .map((order: any) => ({
+      ...order,
+      order_items: order.order_items.filter(
+        (item: any) => item.seller_id === sellerId
+      ),
+    }))
     .filter((o: any) => o.order_items.length > 0)
     .map(mapOrderFields);
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Items individuels (Dashboard vendeur)
+// 🟢 ITEMS PAR VENDEUR (🔥 MANQUAIT → CAUSAIT LE BUILD ERROR)
 //////////////////////////////////////////////////////////////
-export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
+export async function getOrderItemsBySeller(sellerId: string) {
   const { data, error } = await supabase
     .from('order_items')
-    .select(`
-      id,
-      order_id,
-      product_id,
-      quantity,
-      price,
-      seller_id,
-      image_url,
-      title,
-      selected_variant,
-      created_at,
-      customer_name,
-      customer_phone,
-      customer_address,
-      status
-    `)
+    .select('*')
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false });
 
-  if (error || !data) return [];
+  if (error) {
+    console.error('❌ getOrderItemsBySeller error:', error);
+    return [];
+  }
 
-  return data.map((item: any) => {
-    const variant = tryParseVariant(item.selected_variant);
-    return {
-      ...item,
-      variantSize: variant.size ?? '',
-      variantColor: variant.color ?? '',
-      variantPrice: variant.price ?? null,
-    };
-  });
+  return data ?? [];
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH + SMS (POUR TOUS) + SMS client
+// 🔔 PUSH → API (CLIENT ONLY)
 //////////////////////////////////////////////////////////////
-export const createOrder = async (orderData: any): Promise<string> => {
+async function sendPushToSeller(sellerId: string, orderId: string) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const res = await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sellerId, orderId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('❌ Push API error:', err);
+    }
+  } catch (err) {
+    console.error('❌ sendPushToSeller FAILED:', err);
+  }
+}
+
+//////////////////////////////////////////////////////////////
+// 🟢 CRÉATION COMMANDE + PUSH
+//////////////////////////////////////////////////////////////
+export const createOrder = async (
+  orderData: any,
+  fcmInfo?: { token: string; device: string }
+): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
-    // 1️⃣ Créer la commande
-    const { data, error } = await supabase
+    if (!Array.isArray(order_items) || order_items.length === 0) {
+      throw new Error('order_items vide');
+    }
+
+    const sellers = Array.from(
+      new Set(order_items.map((i: any) => String(i.seller_id)))
+    );
+
+    const mainSellerId = sellers[0];
+
+    const { data: order, error } = await supabase
       .from('orders')
-      .insert(orderMain)
+      .insert({ ...orderMain, seller_id: mainSellerId })
       .select()
       .single();
 
-    if (error || !data) throw error;
+    if (error || !order) throw error;
 
-    const orderId = data.id;
+    const orderId = order.id;
 
-    // 2️⃣ Insérer les items
-    if (order_items?.length) {
-      await supabase.from('order_items').insert(
-        order_items.map((item: any) => ({
-          ...item,
-          order_id: orderId,
-        }))
-      );
-    }
-
-    //////////////////////////////////////////////////////////////
-    // 3️⃣ NOTIFICATION VENDEURS (PUSH + EMAIL TOUJOURS)
-    //////////////////////////////////////////////////////////////
-    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))] as string[];
+    await supabase.from('order_items').insert(
+      order_items.map((item: any) => ({
+        ...item,
+        order_id: orderId,
+      }))
+    );
 
     for (const sellerId of sellers) {
-      console.log("➡️ Notification vendeur pour sellerId :", sellerId);
-
-      // 🔹 PUSH (si token existe)
-      const { data: tokens } = await supabase
-        .from('user_tokens')
-        .select('fcm_token')
-        .eq('seller_id', sellerId);
-
-      console.log("   Tokens FCM trouvés :", tokens);
-
-      if (tokens && tokens.length > 0) {
-        console.log("   Envoi PUSH au vendeur...");
-        await fetch('/api/send-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sellerId }),
-        });
-      }
-
-      // 📩 EMAIL (TOUJOURS)
-      const { data: seller } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', sellerId)
-        .single();
-
-      console.log("   Email vendeur :", seller?.email);
-
-      if (!seller?.email) continue;
-
-      // 🔹 Fetch email avec logs et gestion d'erreurs
-      try {
-        console.log("➡️ Envoi email à :", seller.email);
-
-        const emailResponse = await fetch("/api/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: seller.email,
-            subject: "Nouvelle commande",
-            message: "Vous avez une nouvelle commande",
-          }),
-        });
-
-        console.log("   Status response :", emailResponse.status);
-
-        const result = await emailResponse.json().catch(() => null);
-        console.log("   Result send-email :", result);
-
-        if (!emailResponse.ok) {
-          console.error("❌ Erreur en envoyant le mail :", result);
-        } else {
-          console.log("✅ Email envoyé avec succès !");
-        }
-
-      } catch (err) {
-        console.error("❌ Exception lors de l'envoi du mail :", err);
-      }
+      await sendPushToSeller(sellerId, orderId);
     }
 
-    //////////////////////////////////////////////////////////////
-    // 4️⃣ SMS CLIENT
-    //////////////////////////////////////////////////////////////
-    // Removed SMS client notification logic as requested
-
     return orderId;
-
   } catch (err) {
-    console.error('❌ Exception createOrder :', err);
+    console.error('❌ createOrder FAILED:', err);
     throw err;
   }
 };
