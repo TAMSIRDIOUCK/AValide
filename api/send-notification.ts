@@ -65,33 +65,59 @@ export default async function handler(
     //////////////////////////////////////////////////////////////
     // 🔔 Envoi PUSH Firebase
     //////////////////////////////////////////////////////////////
-    const response = await admin.messaging().sendMulticast({
-      tokens,
-      notification: {
-        title: "🛒 Nouvelle commande",
-        body: orderId
-          ? `Commande #${orderId} reçue`
-          : "Nouvelle commande reçue",
-      },
-      data: {
-        orderId: orderId ? String(orderId) : "",
-        url: "/orders",
-      },
-    });
+    try {
+      const response = await admin.messaging().sendMulticast({
+        tokens,
+        notification: {
+          title: "Test push",
+          body: "Vérification push",
+        },
+        data: {
+          orderId: orderId ? String(orderId) : "",
+          url: "/orders",
+        },
+      });
 
-    console.log("✅ PUSH OK", {
-      success: response.successCount,
-      failed: response.failureCount,
-    });
+      // ✅ Résumé global
+      console.log("✅ PUSH OK", {
+        success: response.successCount,
+        failed: response.failureCount,
+      });
 
-    return res.status(200).json({
-      success: true,
-      sent: response.successCount,
-      failed: response.failureCount,
-    });
+      // ℹ️ Détails par token
+      response.responses.forEach((r, i) => {
+        if (r.success) {
+          console.log(`📲 Token OK: ${tokens[i]}`);
+        } else if (r.error) {
+          console.error(
+            `❌ Token FAIL: ${tokens[i]}`,
+            r.error.code,
+            r.error.message
+          );
+        } else {
+          console.error(`❌ Token FAIL: ${tokens[i]} - erreur inconnue`);
+        }
+      });
 
+      // 🔁 Réponse API
+      return res.status(200).json({
+        success: true,
+        sent: response.successCount,
+        failed: response.failureCount,
+        details: response.responses.map((r, i) => ({
+          token: tokens[i],
+          success: r.success,
+          error: r.error
+            ? { code: r.error.code, message: r.error.message }
+            : null,
+        })),
+      });
+    } catch (err) {
+      console.error("🔥 API CRASH (Firebase):", err);
+      return res.status(500).json({ error: "Erreur serveur Firebase" });
+    }
   } catch (err) {
-    console.error("🔥 API CRASH:", err);
+    console.error("🔥 API CRASH (Général):", err);
     return res.status(500).json({ error: "Erreur serveur" });
   }
 }
