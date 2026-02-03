@@ -1,16 +1,8 @@
-export const config = {
-  runtime: "nodejs",
-};
-
-import type { VercelRequest, VercelResponse } from "@vercel/node";
-import * as admin from "firebase-admin";
+import admin from "firebase-admin";
 import { createClient } from "@supabase/supabase-js";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-/* =====================================================
-   🔥 INIT FIREBASE ADMIN (ANTI-CRASH VERCEL)
-===================================================== */
-let firebaseReady = false;
-
+/// 🔹 Initialisation Firebase Admin (clé privée depuis les variables d'environnement)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -28,58 +20,35 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldGdtYWR0b25nZHNwb2pxYXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgxMTg3NDIsImV4cCI6MjA2MzY5NDc0Mn0.h6lHxp0xUjiB2mE6OT-ePqNanmSFKs7zhvvHRtwKXKI"
 );
 
-/* =====================================================
-   🚀 HANDLER
-===================================================== */
+// 🔹 API Handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log("🚀 API /send-notification appelée");
-
   try {
-    if (req.method !== "POST") {
-      console.error("❌ Invalid method: ", req.method);
-      return res.status(405).json({ error: "Méthode non autorisée" });
+    const { sellerId } = req.body;
+
+    let query = supabase.from("user_tokens").select("fcm_token");
+    if (sellerId) {
+      query = query.eq("seller_id", sellerId);
     }
 
-    if (!firebaseReady) {
-      console.error("❌ Firebase Admin not initialized");
-      return res.status(500).json({
-        error: "Firebase Admin non initialisé",
-      });
-    }
-
-    const { sellerId, title, body } = req.body || {};
-    console.log("📩 Received request: ", { sellerId, title, body });
-
-    if (!sellerId) {
-      console.error("❌ Missing sellerId");
-      return res.status(400).json({ error: "sellerId manquant" });
-    }
-
-    /* 🔹 TOKENS */
-    const { data, error } = await supabase
-      .from("user_tokens")
-      .select("fcm_token")
-      .eq("seller_id", sellerId);
+    const { data, error } = await query;
 
     if (error) {
-      console.error("❌ Supabase error: ", error);
-      return res.status(500).json({ error: "Supabase error" });
+      console.error("❌ Supabase error:", error);
+      return res.status(500).json({ error: "Erreur récupération tokens" });
     }
 
-    const tokens = data?.map((t) => t.fcm_token).filter(Boolean) || [];
-    console.log("🔑 Tokens found: ", tokens);
+    const tokens = data?.map(t => t.fcm_token).filter(Boolean);
 
-    if (!tokens.length) {
-      console.warn("⚠️ No FCM tokens found for sellerId: ", sellerId);
+    if (!tokens || tokens.length === 0) {
       return res.status(200).json({ message: "Aucun token FCM" });
     }
 
-    /* 🔔 MESSAGE */
-    const message: admin.messaging.MulticastMessage = {
+    // ✅ DATA ONLY (OBLIGATOIRE)
+    const message = {
       tokens,
-      notification: {
-        title: title || "Nouvelle commande",
-        body: body || "Vous avez une commande",
+      data: {
+        title: "🛒 Nouvelle commande",
+        body: "Un client vient de passer une commande",
       },
     };
 
@@ -109,21 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message: errorMessage,
       });
     }
+
   } catch (err) {
-    let errorMessage = "Unknown error";
-    if (err instanceof Error) {
-      errorMessage = err.message;
-    } else if (
-      typeof err === "object" &&
-      err !== null &&
-      Object.prototype.hasOwnProperty.call(err, "message")
-    ) {
-      errorMessage = String((err as Record<string, unknown>).message);
-    }
-    console.error("🔥 API crashed: ", errorMessage);
-    return res.status(500).json({
-      error: "API crashed",
-      message: errorMessage,
-    });
+    console.error("❌ Notification error:", err);
+    return res.status(500).json({ error: "Erreur serveur" });
   }
 }

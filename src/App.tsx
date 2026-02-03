@@ -1,13 +1,10 @@
+// src/App.tsx
 import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Helmet } from "react-helmet";
+import { Helmet } from "react-helmet"; // Pour gérer le <head>
 import { useAuth } from "./context/AuthContext";
-import {
-  registerServiceWorker,
-  requestNotificationPermission,
-  getFcmToken,
-  listenForegroundNotifications
-} from "./lib/firebaseMessaging";
+import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
+import { getFcmToken, listenForegroundNotifications } from "./lib/firebase";
 
 // --- Components & Pages ---
 import Header from "./components/layout/Header";
@@ -58,21 +55,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initFirebase = async () => {
-      try {
-        await registerServiceWorker();
+      // 1️⃣ Enregistrer le service worker
+      await registerServiceWorker();
 
-        const permissionGranted = await requestNotificationPermission();
-        if (!permissionGranted) {
-          console.warn("[FCM] L'utilisateur n'a pas autorisé les notifications");
-          return;
-        }
+      // 2️⃣ Demander la permission et récupérer le token
+      await requestNotificationPermission();
+      const token = await getFcmToken();
+      if (token) {
+        console.log("Envoyer ce token au serveur :", token);
+      }
 
-        const token = await getFcmToken();
-        if (token) console.log("[FCM] Token récupéré :", token);
-
+      // 3️⃣ Écoute notifications en premier plan
+      if ("Notification" in window && Notification.permission === "granted") {
         listenForegroundNotifications();
-      } catch (err) {
-        console.error("[FCM] Erreur initialisation Firebase :", err);
       }
     };
 
@@ -81,6 +76,7 @@ const App: React.FC = () => {
 
   return (
     <>
+      {/* --- META / MANIFEST / FAVICON --- */}
       <Helmet>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" />
@@ -91,6 +87,7 @@ const App: React.FC = () => {
       <Header />
 
       <Routes>
+        {/* Pages publiques */}
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -103,10 +100,15 @@ const App: React.FC = () => {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/services/:id" element={<ServiceDetailPage />} />
+
+        {/* Détail produit */}
         <Route path="/products/:id" element={<ProductDetailPageWrapper />} />
+
+        {/* Achat accessible sans connexion */}
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/order-success" element={<OrderSuccessPage />} />
 
+        {/* Pages nécessitant une connexion */}
         <Route
           path="/orders"
           element={
@@ -148,6 +150,7 @@ const App: React.FC = () => {
           }
         />
 
+        {/* Redirection si route non trouvée */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
