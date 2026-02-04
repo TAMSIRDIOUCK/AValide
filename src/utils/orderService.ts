@@ -65,7 +65,6 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       total,
       payment_method,
       status,
-      seller_id,
       customer_name,
       customer_phone,
       customer_address,
@@ -124,7 +123,7 @@ export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH (sans email)
+// 🔵 Création commande + PUSH + EMAIL (emails_to_send)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
@@ -134,21 +133,18 @@ export const createOrder = async (orderData: any): Promise<string> => {
       throw new Error("order_items vide");
     }
 
-    // 1️⃣ Déterminer le seller_id principal (premier vendeur)
-    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
-    const mainSellerId = sellers[0]; // ✅ seller principal pour orders.seller_id
-
-    // 2️⃣ Créer la commande avec seller_id
+    // 1️⃣ Créer la commande
     const { data: order, error } = await supabase
       .from('orders')
-      .insert({ ...orderMain, seller_id: mainSellerId })
+      .insert(orderMain)
       .select()
       .single();
 
     if (error || !order) throw error;
+
     const orderId = order.id;
 
-    // 3️⃣ Insérer les items
+    // 2️⃣ Insérer les items
     await supabase.from('order_items').insert(
       order_items.map((item: any) => ({
         ...item,
@@ -156,27 +152,62 @@ export const createOrder = async (orderData: any): Promise<string> => {
       }))
     );
 
-    // 4️⃣ Boucle sur chaque vendeur unique → PUSH NOTIFICATIONS
+    // 3️⃣ Vendeurs uniques
+    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
+
     for (const sellerId of sellers) {
+
+      //////////////////////////////////////////////////
+      // 🔔 PUSH NOTIFICATION
+      //////////////////////////////////////////////////
       try {
         const { data: tokens } = await supabase
           .from('user_tokens')
           .select('fcm_token')
           .eq('seller_id', sellerId);
 
-          if (tokens?.length) {
-            await fetch('/api/send-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                tokens: tokens.map(t => t.fcm_token),
-                orderId
-              }),
-            });
-          }
-          
+        if (tokens?.length) {
+          await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sellerId }),
+          });
+        }
       } catch (e) {
         console.warn('Push error:', e);
+      }
+
+      //////////////////////////////////////////////////
+      // 📧 EMAIL → emails_to_send
+      //////////////////////////////////////////////////
+      try {
+        const { data: seller } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', sellerId)
+          .single();
+
+        if (!seller?.email) continue;
+
+        const emailRow = {
+          recipient: seller.email, // ✅ IMPORTANT
+          subject: 'Nouvelle commande AVALIDE',
+          message: 'Vous avez reçu une nouvelle commande.',
+          seller_id: sellerId,
+          order_id: orderId,
+          status: 'pending',
+        };
+
+        const { error: emailError } = await supabase
+          .from('emails_to_send')
+          .insert(emailRow);
+
+        if (emailError) {
+          console.error('Erreur emails_to_send:', emailError);
+        }
+
+      } catch (err) {
+        console.error('Erreur email:', err);
       }
     }
 
