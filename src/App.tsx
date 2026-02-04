@@ -1,10 +1,15 @@
 // src/App.tsx
 import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Helmet } from "react-helmet"; // Pour gérer le <head>
+import { Helmet } from "react-helmet";
 import { useAuth } from "./context/AuthContext";
-import { registerServiceWorker, requestNotificationPermission } from "./lib/firebaseMessaging";
-import { getFcmToken, listenForegroundNotifications } from "./lib/firebase";
+import {
+  getFcmToken,
+  listenForegroundNotifications,
+  registerServiceWorker,
+  requestFirebasePermission,
+} from "./lib/firebase";
+// ✅ tout importé depuis firebase.ts
 
 // --- Components & Pages ---
 import Header from "./components/layout/Header";
@@ -55,14 +60,18 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initFirebase = async () => {
-      // 1️⃣ Enregistrer le service worker
-      await registerServiceWorker();
+      // 1️⃣ Enregistrer le Service Worker
+      try {
+        await registerServiceWorker();
+        console.log("✅ Service Worker Firebase enregistré");
+      } catch (err) {
+        console.error("❌ Erreur Service Worker :", err);
+      }
 
       // 2️⃣ Demander la permission et récupérer le token
-      await requestNotificationPermission();
-      const token = await getFcmToken();
-      if (token) {
-        console.log("Envoyer ce token au serveur :", token);
+      if (user?.id) {
+        const token = await requestFirebasePermission(user.id);
+        if (token) console.log("Envoyer ce token au serveur :", token);
       }
 
       // 3️⃣ Écoute notifications en premier plan

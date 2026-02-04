@@ -1,8 +1,10 @@
-// Import des scripts Firebase
+/* eslint-disable no-undef */
+
+// Firebase compat (OBLIGATOIRE pour SW)
 importScripts("https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js");
 
-// Initialisation Firebase
+// 🔥 INIT FIREBASE
 firebase.initializeApp({
   apiKey: "AIzaSyBNM88NZV3Rxsj-rp25zB1QWfwTSO0_KnQ",
   authDomain: "avalide-push.firebaseapp.com",
@@ -13,26 +15,37 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// 🔔 NOTIFICATIONS BACKGROUND (OBLIGATOIRE POUR iOS)
+// 🔔 BACKGROUND MESSAGE (DATA ONLY)
 messaging.onBackgroundMessage((payload) => {
   console.log("[SW] Payload reçu:", payload);
 
-  const title = payload.data?.title || "Nouvelle commande AValide";
-  const options = {
-    body: payload.data?.body || "Vous avez une nouvelle commande",
+  const title = payload.data?.title ?? "Nouvelle notification AValide";
+  const body = payload.data?.body ?? "Vous avez une nouvelle notification";
+
+  const notificationOptions = {
+    body,
     icon: "/videos/IMG_1696.jpg",
     badge: "/videos/IMG_1696.jpg",
-    data: { url: "/orders" },
+    data: {
+      url: payload.data?.url ?? "/",
+    },
   };
 
-  self.registration.showNotification(title, options);
+  self.registration.showNotification(title, notificationOptions);
 });
 
-// 👉 Action au clic
+// 👉 CLICK SUR NOTIFICATION
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   event.waitUntil(
-    clients.openWindow(event.notification.data.url)
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(event.notification.data.url)) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow(event.notification.data.url);
+    })
   );
 });
