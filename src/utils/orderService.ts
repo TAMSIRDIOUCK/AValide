@@ -2,9 +2,9 @@ import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
 
 //////////////////////////////////////////////////////////////
-// 🔎 Parse sécurisé
+// 🔎 Parse TEXT → JSON sécurisé
 //////////////////////////////////////////////////////////////
-function tryParseVariant(v: unknown): any {
+function tryParseVariant(v: any) {
   if (!v) return {};
   if (typeof v === 'object') return v;
   if (typeof v === 'string') {
@@ -18,7 +18,7 @@ function tryParseVariant(v: unknown): any {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔁 Mapper Order
+// 🔁 Transforme une ligne Supabase en objet Order
 //////////////////////////////////////////////////////////////
 function mapOrderFields(order: any): Order {
   return {
@@ -43,6 +43,9 @@ function mapOrderFields(order: any): Order {
         variantSize: variant.size ?? '',
         variantColor: variant.color ?? '',
         variantPrice: variant.price ?? null,
+        customerName: item.customer_name ?? '',
+        customerPhone: item.customer_phone ?? '',
+        customerAddress: item.customer_address ?? '',
         status: item.status ?? 'en_attente',
       };
     }),
@@ -50,7 +53,7 @@ function mapOrderFields(order: any): Order {
 }
 
 //////////////////////////////////////////////////////////////
-// 🟢 Commandes par vendeur
+// 🟢 Commandes vendeur
 //////////////////////////////////////////////////////////////
 export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
@@ -62,11 +65,13 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
       total,
       payment_method,
       status,
+      seller_id,
       customer_name,
       customer_phone,
       customer_address,
       order_items (
         id,
+        order_id,
         product_id,
         quantity,
         price,
@@ -74,15 +79,15 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
         image_url,
         title,
         selected_variant,
+        customer_name,
+        customer_phone,
+        customer_address,
         status
       )
     `)
     .order('created_at', { ascending: false });
 
-  if (error || !data) {
-    console.error('❌ getOrdersBySeller:', error);
-    return [];
-  }
+  if (error || !data) return [];
 
   return data
     .map((order: any) => ({
@@ -96,86 +101,89 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🟢 Items vendeur
+// 🔵 Items vendeur
 //////////////////////////////////////////////////////////////
-export async function getOrderItemsBySeller(sellerId: string) {
+export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
   const { data, error } = await supabase
     .from('order_items')
     .select('*')
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('❌ getOrderItemsBySeller:', error);
-    return [];
-  }
+  if (error || !data) return [];
 
-  return data ?? [];
+  return data.map((item: any) => {
+    const variant = tryParseVariant(item.selected_variant);
+    return {
+      ...item,
+      variantSize: variant.size ?? '',
+      variantColor: variant.color ?? '',
+      variantPrice: variant.price ?? null,
+    };
+  });
 }
 
 //////////////////////////////////////////////////////////////
-// 🔔 Push → API (SAFE)
-//////////////////////////////////////////////////////////////
-async function sendPushToSeller(sellerId: string, orderId: string) {
-  if (typeof window === 'undefined') return;
-
-  try {
-    const res = await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sellerId, orderId }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('❌ Push API error:', text);
-    }
-  } catch (err) {
-    console.error('❌ Push fetch failed:', err);
-  }
-}
-
-//////////////////////////////////////////////////////////////
-// 🟢 Création commande (SOLIDE)
+// 🔵 Création commande + PUSH (sans email)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
-  const { order_items, ...orderMain } = orderData;
+  try {
+    const { order_items, ...orderMain } = orderData;
 
-  if (!Array.isArray(order_items) || order_items.length === 0) {
-    throw new Error('order_items vide');
+    if (!order_items?.length) {
+      throw new Error("order_items vide");
+    }
+
+    // 1️⃣ Déterminer le seller_id principal (premier vendeur)
+    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
+    const mainSellerId = sellers[0]; // ✅ seller principal pour orders.seller_id
+
+    // 2️⃣ Créer la commande avec seller_id
+    const { data: order, error } = await supabase
+      .from('orders')
+      .insert({ ...orderMain, seller_id: mainSellerId })
+      .select()
+      .single();
+
+    if (error || !order) throw error;
+    const orderId = order.id;
+
+    // 3️⃣ Insérer les items
+    await supabase.from('order_items').insert(
+      order_items.map((item: any) => ({
+        ...item,
+        order_id: orderId,
+      }))
+    );
+
+    // 4️⃣ Boucle sur chaque vendeur unique → PUSH NOTIFICATIONS
+    for (const sellerId of sellers) {
+      try {
+        const { data: tokens } = await supabase
+          .from('user_tokens')
+          .select('fcm_token')
+          .eq('seller_id', sellerId);
+
+          if (tokens?.length) {
+            await fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tokens: tokens.map(t => t.fcm_token),
+                orderId
+              }),
+            });
+          }
+          
+      } catch (e) {
+        console.warn('Push error:', e);
+      }
+    }
+
+    return orderId;
+
+  } catch (err) {
+    console.error('❌ createOrder FAILED:', err);
+    throw err;
   }
-
-  const sellers = [...new Set(order_items.map((i: any) => String(i.seller_id)))];
-  const mainSellerId = sellers[0];
-
-  // 1️⃣ Insert order
-  const { data: order, error } = await supabase
-    .from('orders')
-    .insert({ ...orderMain, seller_id: mainSellerId })
-    .select()
-    .single();
-
-  if (error || !order) {
-    console.error('❌ Insert order failed:', error);
-    throw error;
-  }
-
-  // 2️⃣ Insert items
-  const { error: itemsError } = await supabase.from('order_items').insert(
-    order_items.map((item: any) => ({
-      ...item,
-      order_id: order.id,
-    }))
-  );
-
-  if (itemsError) {
-    console.error('❌ Insert order_items failed:', itemsError);
-  }
-
-  // 3️⃣ Push async (non bloquant)
-  sellers.forEach((sellerId) => {
-    sendPushToSeller(sellerId, order.id);
-  });
-
-  return order.id;
 };

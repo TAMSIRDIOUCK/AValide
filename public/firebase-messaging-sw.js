@@ -13,32 +13,26 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Notifications en arrière-plan (site fermé ou minimisé)
+// 🔔 NOTIFICATIONS BACKGROUND (OBLIGATOIRE POUR iOS)
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || "Nouvelle commande AValide";
+  console.log("[SW] Payload reçu:", payload);
+
+  const title = payload.data?.title || "Nouvelle commande AValide";
   const options = {
-    body: payload.notification?.body || "Vous avez une nouvelle commande",
+    body: payload.data?.body || "Vous avez une nouvelle commande",
     icon: "/videos/IMG_1696.jpg",
     badge: "/videos/IMG_1696.jpg",
-    data: { url: "/orders" }, // redirection vers MyOrdersPage
+    data: { url: "/orders" },
   };
 
   self.registration.showNotification(title, options);
 });
 
-// Clic sur la notification → redirection vers MyOrdersPage
+// 👉 Action au clic
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ("focus" in client) {
-          client.navigate(event.notification.data.url);
-          return client.focus();
-        }
-      }
-      return clients.openWindow(event.notification.data.url);
-    })
+    clients.openWindow(event.notification.data.url)
   );
 });
