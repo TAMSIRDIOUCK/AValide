@@ -1,8 +1,9 @@
+// orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
 
 //////////////////////////////////////////////////////////////
-// 🔎 Parse TEXT → JSON sécurisé
+// 🔎 Parse TEXT → JSON sécurisé (pour les variantes)
 //////////////////////////////////////////////////////////////
 function tryParseVariant(v: any) {
   if (!v) return {};
@@ -53,7 +54,7 @@ function mapOrderFields(order: any): Order {
 }
 
 //////////////////////////////////////////////////////////////
-// 🟢 Commandes vendeur
+// 🟢 Récupération commandes pour un vendeur
 //////////////////////////////////////////////////////////////
 export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
@@ -92,6 +93,7 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   return data
     .map((order: any) => ({
       ...order,
+      // On garde uniquement les items du seller demandé
       order_items: order.order_items.filter(
         (item: any) => item.seller_id === sellerId
       ),
@@ -101,21 +103,20 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH NOTIFICATION (CORRIGÉ)
+// 🔵 Création commande + PUSH notification
+// ⚠️ Côté frontend, utilisez un endpoint API pour le push
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
-    if (!order_items?.length) {
-      throw new Error('order_items vide');
-    }
+    if (!order_items?.length) throw new Error('order_items vide');
 
-    // 1️⃣ vendeurs uniques
+    // 1️⃣ Vendeurs uniques
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
-    const mainSellerId = sellers[0];
+    const mainSellerId = sellers[0]; // vendeur principal
 
-    // 2️⃣ création commande
+    // 2️⃣ Création de la commande
     const { data: order, error } = await supabase
       .from('orders')
       .insert({ ...orderMain, seller_id: mainSellerId })
@@ -125,15 +126,12 @@ export const createOrder = async (orderData: any): Promise<string> => {
     if (error || !order) throw error;
     const orderId = order.id;
 
-    // 3️⃣ insertion items
+    // 3️⃣ Insertion des items
     await supabase.from('order_items').insert(
-      order_items.map((item: any) => ({
-        ...item,
-        order_id: orderId,
-      }))
+      order_items.map((item: any) => ({ ...item, order_id: orderId }))
     );
 
-    // 4️⃣ PUSH notifications
+    // 4️⃣ PUSH notifications via API (frontend → /api/send-notification)
     for (const sellerId of sellers) {
       const { data: tokens } = await supabase
         .from('user_tokens')
@@ -142,27 +140,18 @@ export const createOrder = async (orderData: any): Promise<string> => {
 
       if (!tokens?.length) continue;
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/send-notification`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_API_SECRET}`,
-          },
-          body: JSON.stringify({
-            sellerId,
-            orderId,
-          }),
-        }
-      );
-
-      const text = await response.text();
-      console.log('📨 PUSH RESPONSE:', text);
+      // Appel de l'API côté backend pour envoyer le push
+      await fetch(`${import.meta.env.VITE_API_URL}/api/send-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_API_SECRET}`,
+        },
+        body: JSON.stringify({ sellerId, orderId }),
+      });
     }
 
     return orderId;
-
   } catch (err) {
     console.error('❌ createOrder FAILED:', err);
     throw err;
