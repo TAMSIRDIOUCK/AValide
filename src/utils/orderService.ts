@@ -101,44 +101,21 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Items vendeur
-//////////////////////////////////////////////////////////////
-export async function getOrderItemsBySeller(sellerId: string): Promise<any[]> {
-  const { data, error } = await supabase
-    .from('order_items')
-    .select('*')
-    .eq('seller_id', sellerId)
-    .order('created_at', { ascending: false });
-
-  if (error || !data) return [];
-
-  return data.map((item: any) => {
-    const variant = tryParseVariant(item.selected_variant);
-    return {
-      ...item,
-      variantSize: variant.size ?? '',
-      variantColor: variant.color ?? '',
-      variantPrice: variant.price ?? null,
-    };
-  });
-}
-
-//////////////////////////////////////////////////////////////
-// 🔵 Création commande + PUSH (sans email)
+// 🔵 Création commande + PUSH NOTIFICATION (CORRIGÉ)
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
 
     if (!order_items?.length) {
-      throw new Error("order_items vide");
+      throw new Error('order_items vide');
     }
 
-    // 1️⃣ Déterminer le seller_id principal (premier vendeur)
+    // 1️⃣ vendeurs uniques
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
-    const mainSellerId = sellers[0]; // ✅ seller principal pour orders.seller_id
+    const mainSellerId = sellers[0];
 
-    // 2️⃣ Créer la commande avec seller_id
+    // 2️⃣ création commande
     const { data: order, error } = await supabase
       .from('orders')
       .insert({ ...orderMain, seller_id: mainSellerId })
@@ -148,7 +125,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
     if (error || !order) throw error;
     const orderId = order.id;
 
-    // 3️⃣ Insérer les items
+    // 3️⃣ insertion items
     await supabase.from('order_items').insert(
       order_items.map((item: any) => ({
         ...item,
@@ -156,28 +133,32 @@ export const createOrder = async (orderData: any): Promise<string> => {
       }))
     );
 
-    // 4️⃣ Boucle sur chaque vendeur unique → PUSH NOTIFICATIONS
+    // 4️⃣ PUSH notifications
     for (const sellerId of sellers) {
-      try {
-        const { data: tokens } = await supabase
-          .from('user_tokens')
-          .select('fcm_token')
-          .eq('seller_id', sellerId);
+      const { data: tokens } = await supabase
+        .from('user_tokens')
+        .select('fcm_token')
+        .eq('seller_id', sellerId);
 
-          if (tokens?.length) {
-            await fetch('/api/send-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                tokens: tokens.map(t => t.fcm_token),
-                orderId
-              }),
-            });
-          }
-          
-      } catch (e) {
-        console.warn('Push error:', e);
-      }
+      if (!tokens?.length) continue;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/send-notification`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_API_SECRET}`,
+          },
+          body: JSON.stringify({
+            sellerId,
+            orderId,
+          }),
+        }
+      );
+
+      const text = await response.text();
+      console.log('📨 PUSH RESPONSE:', text);
     }
 
     return orderId;
