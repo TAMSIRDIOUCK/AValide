@@ -1,11 +1,8 @@
-// send-notification.ts
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-//////////////////////////////////////////////////////////////
-// 🔐 Init Firebase Admin (uniquement si pas déjà initialisé)
-//////////////////////////////////////////////////////////////
+// 🔐 Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -16,67 +13,54 @@ if (!admin.apps.length) {
   });
 }
 
-//////////////////////////////////////////////////////////////
-// 🔐 Supabase Client avec Service Role Key
-//////////////////////////////////////////////////////////////
+// 🔐 Supabase Service Role
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-//////////////////////////////////////////////////////////////
-// 🔹 Handler API Vercel
-//////////////////////////////////////////////////////////////
+// 🔹 Handler API
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Vérification du secret côté API
-    if (req.headers.authorization !== `Bearer ${process.env.API_SECRET}`) {
+    if (req.headers.authorization !== `Bearer ${process.env.API_SECRET}`)
       return res.status(401).json({ error: 'Unauthorized' });
-    }
 
     const { sellerId, orderId } = req.body;
-    if (!sellerId || !orderId) {
-      return res.status(400).json({ error: 'sellerId ou orderId manquant' });
-    }
+    if (!sellerId) return res.status(400).json({ error: 'sellerId manquant' });
 
-    // 🔹 Récupération des tokens FCM du vendeur
-    const { data } = await supabase
-      .from('user_tokens')
-      .select('fcm_token')
-      .eq('seller_id', sellerId);
+    // Récup tokens
+    const { data } = await supabase.from('user_tokens').select('fcm_token').eq('seller_id', sellerId);
+    const tokens = data?.map(t => t.fcm_token).filter(Boolean);
+    if (!tokens?.length) return res.json({ message: 'Aucun token' });
 
-    const tokens = data?.map(t => t.fcm_token).filter(Boolean) as string[];
-    if (!tokens?.length) return res.json({ message: 'Aucun token FCM trouvé pour ce vendeur' });
-
-    // 🔹 Envoi notification via Firebase Admin
-    const response = await admin.messaging().sendMulticast({
+    // Envoi notification
+    const response = await admin.messaging().sendEachForMulticast({
       tokens,
       notification: {
         title: '🛒 Nouvelle commande',
-        body: `Vous avez reçu une nouvelle commande #${orderId}`,
+        body: 'Vous avez reçu une commande',
       },
       data: {
-        orderId: String(orderId),
         url: '/orders',
+        orderId: String(orderId),
       },
     });
 
-    // 🔹 Nettoyage des tokens invalides
+    // Nettoyage tokens invalides
     const invalidTokens: string[] = [];
-    response.responses.forEach((resp: admin.messaging.SendResponse, i: number) => {
-      if (!resp.success) invalidTokens.push(tokens[i]);
+    response.responses.forEach((r, i) => {
+      if (!r.success) invalidTokens.push(tokens[i]);
     });
 
-    if (invalidTokens.length > 0) {
+    if (invalidTokens.length)
       await supabase.from('user_tokens').delete().in('fcm_token', invalidTokens);
-    }
 
-    // 🔹 Réponse API
     return res.json({
       sent: response.successCount,
       failed: response.failureCount,
       cleaned: invalidTokens.length,
     });
+
   } catch (err) {
     console.error('❌ PUSH ERROR:', err);
     return res.status(500).json({ error: 'Erreur serveur' });
