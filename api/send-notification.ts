@@ -1,8 +1,8 @@
-// api/send-notification.ts
 import admin from 'firebase-admin';
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// 🔐 Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -13,11 +13,13 @@ if (!admin.apps.length) {
   });
 }
 
+// 🔐 Supabase Service Role
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// 🔹 Handler API
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.headers.authorization !== `Bearer ${process.env.API_SECRET}`)
@@ -26,18 +28,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { sellerId, orderId } = req.body;
     if (!sellerId) return res.status(400).json({ error: 'sellerId manquant' });
 
-    const { data } = await supabase
-      .from('user_tokens')
-      .select('fcm_token')
-      .eq('seller_id', sellerId);
-
+    // Récup tokens
+    const { data } = await supabase.from('user_tokens').select('fcm_token').eq('seller_id', sellerId);
     const tokens = data?.map(t => t.fcm_token).filter(Boolean);
     if (!tokens?.length) return res.json({ message: 'Aucun token' });
 
+    // Envoi notification
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
-      notification: { title: '🛒 Nouvelle commande', body: 'Vous avez reçu une commande' },
-      data: { url: '/orders', orderId: String(orderId || '') },
+      notification: {
+        title: '🛒 Nouvelle commande',
+        body: 'Vous avez reçu une commande',
+      },
+      data: {
+        url: '/orders',
+        orderId: String(orderId),
+      },
     });
 
     // Nettoyage tokens invalides
@@ -54,9 +60,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       failed: response.failureCount,
       cleaned: invalidTokens.length,
     });
+
   } catch (err) {
-    console.error(err);
+    console.error('❌ PUSH ERROR:', err);
     return res.status(500).json({ error: 'Erreur serveur' });
   }
 }
- 
