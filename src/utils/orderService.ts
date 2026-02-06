@@ -1,20 +1,25 @@
+// orderService.ts
 import { supabase } from '../lib/supabaseClient';
 import { Order } from '../types/types';
 
 //////////////////////////////////////////////////////////////
-// 🔎 Parse JSON sécurisé
+// 🔎 Parse JSON sécurisé (pour les variants de produit)
 //////////////////////////////////////////////////////////////
 function tryParseVariant(v: any) {
   if (!v) return {};
   if (typeof v === 'object') return v;
   if (typeof v === 'string') {
-    try { return JSON.parse(v); } catch { return {}; }
+    try {
+      return JSON.parse(v);
+    } catch {
+      return {};
+    }
   }
   return {};
 }
 
 //////////////////////////////////////////////////////////////
-// 🔁 Map une commande Supabase en Order
+// 🔁 Map une commande Supabase en objet Order
 //////////////////////////////////////////////////////////////
 function mapOrderFields(order: any): Order {
   return {
@@ -49,7 +54,7 @@ function mapOrderFields(order: any): Order {
 }
 
 //////////////////////////////////////////////////////////////
-// 🟢 Récupérer commandes d’un vendeur
+// 🟢 Récupérer toutes les commandes d’un vendeur
 //////////////////////////////////////////////////////////////
 export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
   const { data, error } = await supabase
@@ -95,17 +100,18 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Créer commande + envoyer notification via API
+// 🔵 Créer une commande + envoyer notifications
 //////////////////////////////////////////////////////////////
 export const createOrder = async (orderData: any): Promise<string> => {
   try {
     const { order_items, ...orderMain } = orderData;
     if (!order_items?.length) throw new Error('order_items vide');
 
+    // 1️⃣ Identifier tous les vendeurs uniques
     const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
     const mainSellerId = sellers[0];
 
-    // Création commande
+    // 2️⃣ Créer la commande principale
     const { data: order, error } = await supabase
       .from('orders')
       .insert({ ...orderMain, seller_id: mainSellerId })
@@ -115,12 +121,12 @@ export const createOrder = async (orderData: any): Promise<string> => {
     if (error || !order) throw error;
     const orderId = order.id;
 
-    // Insertion des items
+    // 3️⃣ Ajouter les items
     await supabase.from('order_items').insert(
       order_items.map((item: any) => ({ ...item, order_id: orderId }))
     );
 
-    // Envoi notification via endpoint Vercel
+    // 4️⃣ Envoyer notifications via API backend (Vercel)
     for (const sellerId of sellers) {
       await fetch(`${import.meta.env.VITE_API_URL}/api/send-notification`, {
         method: 'POST',
