@@ -5,12 +5,12 @@ import { Order } from '../types/types';
 //////////////////////////////////////////////////////////////
 // 🔎 Parse JSON sécurisé (pour les variants de produit)
 //////////////////////////////////////////////////////////////
-function tryParseVariant(v: any) {
-  if (!v) return {};
-  if (typeof v === 'object') return v;
-  if (typeof v === 'string') {
+function tryParseVariant(value: any) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  if (typeof value === 'string') {
     try {
-      return JSON.parse(v);
+      return JSON.parse(value);
     } catch {
       return {};
     }
@@ -100,15 +100,15 @@ export async function getOrdersBySeller(sellerId: string): Promise<Order[]> {
 }
 
 //////////////////////////////////////////////////////////////
-// 🔵 Créer une commande + envoyer notifications
+// 🔵 Créer une commande + appeler API backend pour notification
 //////////////////////////////////////////////////////////////
-export const createOrder = async (orderData: any): Promise<string> => {
+export async function createOrder(orderData: any): Promise<string> {
   try {
     const { order_items, ...orderMain } = orderData;
     if (!order_items?.length) throw new Error('order_items vide');
 
     // 1️⃣ Identifier tous les vendeurs uniques
-    const sellers = [...new Set(order_items.map((i: any) => i.seller_id))];
+    const sellers = [...new Set(order_items.map((item: any) => item.seller_id))];
     const mainSellerId = sellers[0];
 
     // 2️⃣ Créer la commande principale
@@ -126,7 +126,7 @@ export const createOrder = async (orderData: any): Promise<string> => {
       order_items.map((item: any) => ({ ...item, order_id: orderId }))
     );
 
-    // 4️⃣ Envoyer notifications via API backend (Vercel)
+    // 4️⃣ Appeler API backend pour notification (sécurisée)
     for (const sellerId of sellers) {
       await fetch(`${import.meta.env.VITE_API_URL}/api/send-notification`, {
         method: 'POST',
@@ -144,4 +144,4 @@ export const createOrder = async (orderData: any): Promise<string> => {
     console.error('❌ createOrder FAILED:', err);
     throw err;
   }
-};
+}
